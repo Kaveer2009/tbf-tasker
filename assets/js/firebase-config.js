@@ -1,4 +1,7 @@
-// Firebase v9 COMPAT SDK (matches your HTML)
+// Firebase modular SDK
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUVdzmmeLUyVICm36khJVF38lMpMPk1qE",
@@ -9,15 +12,6 @@ const firebaseConfig = {
   appId: "1:1055796115720:web:00c66aef9af126b83b94bd"
 };
 
-// INIT
-firebase.initializeApp(firebaseConfig);
-
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-// Make available globally
-window.auth = auth;
-window.db = db;
-
-//temp
-// export { app, auth, db };
+export const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);

@@ -1,135 +1,72 @@
-// auth.onAuthStateChanged(async (user) => {
-//   if (!user) {
-//     window.location.href = "login.html";
-//     return;
-//   }
+import { auth, db } from "./firebase-config.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-//   loadMyTasks(user.uid);
-// });
+const taskListDiv = document.getElementById("taskList");
+const logoutBtn = document.getElementById("logoutBtn");
 
-// // Logout
-// document.getElementById("logoutBtn").onclick = () => {
-//   auth.signOut().then(() => {
-//     window.location.href = "login.html";
-//   });
-// };
-
-// // Load employee-specific tasks
-// function loadMyTasks(uid) {
-//   const list = document.getElementById("tasks");
-//   list.innerHTML = "";
-
-//   db.collection("tasks")
-//     .where("assignedTo", "==", uid)
-//     .orderBy("createdAt", "desc")
-//     .onSnapshot(
-//       (snap) => {
-//         list.innerHTML = "";
-
-//         if (snap.empty) {
-//           list.innerHTML = "<li>No tasks assigned.</li>";
-//           return;
-//         }
-
-//         snap.forEach((doc) => {
-//           const data = doc.data();
-//           const li = document.createElement("li");
-
-//           li.innerHTML = `
-//             <strong>${data.title}</strong><br>
-//             Status: ${data.status}<br>
-//             <button class="doneBtn" data-id="${doc.id}">
-//               Mark as Done
-//             </button>
-//           `;
-
-//           list.appendChild(li);
-//         });
-
-//         attachDoneButtons();
-//       },
-//       (err) => {
-//         console.error(err);
-//         alert("Error loading tasks");
-//       }
-//     );
-// }
-
-// // Button: Mark task as done
-// function attachDoneButtons() {
-//   document.querySelectorAll(".doneBtn").forEach((btn) => {
-//     btn.onclick = async (e) => {
-//       const id = btn.dataset.id;
-//       try {
-//         await db.collection("tasks").doc(id).update({
-//           status: "done",
-//           doneAt: firebase.firestore.FieldValue.serverTimestamp(),
-//         });
-//       } catch (err) {
-//         console.error(err);
-//         alert("Error marking done: " + err.message);
-//       }
-//     };
-//   });
-// }
-
-// employee.js - Firebase Compat Version
-
-document.addEventListener("DOMContentLoaded", () => {
-    const tasksContainer = document.getElementById("tasksContainer");
-
-    // Wait for auth state
-    window.auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-            window.location.href = "login.html";
-            return;
-        }
-
-        console.log("Logged in as:", user.email);
-
-        loadTasks(user.uid);  // Use UID for assignedTo
-    });
+onAuthStateChanged(auth, user => {
+  if (!user) {
+    window.location.href="login.html";
+    return;
+  }
+  loadTasks(user.uid);
 });
 
-function loadTasks(uid) {
-    const tasksContainer = document.getElementById("tasksContainer");
-    tasksContainer.innerHTML = "Loading...";
+logoutBtn.addEventListener("click", () => {
+  signOut(auth).then(() => window.location.href="login.html");
+});
 
-    window.db.collection("tasks")
-        .where("assignedTo", "==", uid)
-        .orderBy("createdAt", "desc")
-        .onSnapshot(snapshot => {
-            tasksContainer.innerHTML = "";
-
-            if (snapshot.empty) {
-                tasksContainer.innerHTML = "<p>No tasks assigned.</p>";
-                return;
-            }
-
-            snapshot.forEach(doc => {
-                const task = doc.data();
-                const div = document.createElement("div");
-
-                div.innerHTML = `
-                    <h3>${task.title}</h3>
-                    <p>${task.description}</p>
-                    <p><strong>Status:</strong> ${task.status}</p>
-                    ${task.status !== "done" ? `<button onclick="markDone('${doc.id}')">Mark as Done</button>` : ""}
-                    <hr>
-                `;
-
-                tasksContainer.appendChild(div);
-            });
-        }, err => {
-            console.error("Error loading tasks:", err);
-            tasksContainer.innerHTML = "Error loading tasks.";
-        });
+function formatTimeLeft(deadline) {
+  const now = new Date();
+  const diff = deadline - now;
+  if (diff <= 0) return "Expired";
+  const days = Math.floor(diff/1000/60/60/24);
+  const hours = Math.floor((diff/1000/60/60) % 24);
+  const minutes = Math.floor((diff/1000/60) % 60);
+  return `${days}d ${hours}h ${minutes}m`;
 }
 
-function markDone(id) {
-    window.db.collection("tasks").doc(id).update({
-        status: "done"
-    }).then(() => {
-        alert("Task marked done!");
+function loadTasks(uid) {
+  const q = query(collection(db, "tasks"), where("assignedTo","==",uid), orderBy("createdAt","desc"));
+  onSnapshot(q, snapshot => {
+    taskListDiv.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const t = docSnap.data();
+      const id = docSnap.id;
+      const deadlineDate = t.deadline?.toDate ? t.deadline.toDate() : new Date(t.deadline);
+      const div = document.createElement("div");
+
+      div.innerHTML = `
+        <h3>${t.title}</h3>
+        <p>${t.description}</p>
+        <p><b>Status:</b> ${t.status}</p>
+        <p><b>Assigned:</b> ${t.createdAt?.toDate ? t.createdAt.toDate().toLocaleString() : "N/A"}</p>
+        <p><b>Deadline:</b> ${deadlineDate.toLocaleString()}</p>
+        <p><b>Time Left:</b> ${formatTimeLeft(deadlineDate)}</p>
+      `;
+
+      if (t.status !== "done") {
+        const btn = document.createElement("button");
+        btn.textContent = "Mark as Done";
+        btn.addEventListener("click", async () => {
+          await updateDoc(doc(db, "tasks", id), { status: "done" });
+        });
+        div.appendChild(btn);
+      } else {
+        const doneSpan = document.createElement("span");
+        doneSpan.textContent = "✔ Completed";
+        doneSpan.style.color="green";
+        doneSpan.style.fontWeight="bold";
+        div.appendChild(doneSpan);
+      }
+
+      div.style.border="1px solid #aaa";
+      div.style.padding="10px";
+      div.style.margin="10px 0";
+      div.style.borderRadius="6px";
+
+      taskListDiv.appendChild(div);
     });
+  });
 }

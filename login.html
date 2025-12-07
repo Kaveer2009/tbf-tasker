@@ -1,50 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TaskManager — Login</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-  <script src="assets/js/firebase-config.js"></script>
-  <style>
-    body { font-family: Arial; display: flex; flex-direction: column; align-items: center; margin-top: 50px; }
-    input { margin: 5px 0; padding: 8px; width: 200px; }
-    button { padding: 8px 16px; margin-top: 10px; cursor: pointer; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskManager — Login</title>
+<script type="module" src="assets/js/login.js"></script>
+<style>
+  body { font-family: Arial; display: flex; flex-direction: column; align-items: center; margin-top: 50px; }
+  input { margin: 5px 0; padding: 8px; width: 200px; }
+  button { padding: 8px 16px; margin-top: 10px; cursor: pointer; }
+</style>
 </head>
 <body>
-  <h2>TaskManager Login</h2>
-  <input type="email" id="email" placeholder="Email" required>
-  <input type="password" id="password" placeholder="Password" required>
-  <button id="loginBtn">Login</button>
-
-  <script>
-    const adminEmails = ['kaveer.is.king@gmail.com']; // trusted admins
-
-    // Redirect if already logged in
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        if (adminEmails.includes(user.email)) window.location.href = 'admin.html';
-        else window.location.href = 'employee.html';
-      }
-    });
-
-    document.getElementById('loginBtn').addEventListener('click', () => {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-
-      if (!email || !password) return alert('Enter email & password');
-
-      auth.signInWithEmailAndPassword(email, password)
-        .then(userCredential => {
-          const user = userCredential.user;
-          if (adminEmails.includes(user.email)) window.location.href = 'admin.html';
-          else window.location.href = 'employee.html';
-        })
-        .catch(error => alert(error.message));
-    });
-  </script>
+<h2>TaskManager Login</h2>
+<input type="email" id="email" placeholder="Email" required>
+<input type="password" id="password" placeholder="Password" required>
+<button id="loginBtn">Login</button>
 </body>
 </html>
