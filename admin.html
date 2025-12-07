@@ -1,0 +1,78 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TaskManager — Admin</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Admin — TaskManager</h1>
+    <button id="logoutBtn">Logout</button>
+
+    <section id="createTask">
+      <h2>Create Task</h2>
+      <input id="title" placeholder="Task title">
+      <textarea id="desc" placeholder="Description"></textarea>
+      <input id="assignedTo" placeholder="Assign to (user uid)">
+      <input id="dueAt" type="datetime-local">
+      <button id="createBtn">Create Task</button>
+    </section>
+
+    <section id="tasksList">
+      <h2>All Tasks</h2>
+      <ul id="tasks"></ul>
+    </section>
+  </main>
+<div id="taskList">Loading...</div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TaskManager — Admin</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+  <main class="container">
+    <h1>Admin — TaskManager</h1>
+    <button id="logoutBtn">Logout</button>
+
+    <section id="createTask">
+      <h2>Create Task</h2>
+
+      <input id="taskTitle" placeholder="Task title">
+      <textarea id="taskDescription" placeholder="Description"></textarea>
+      <input id="assignedTo" placeholder="Assign to (user UID)">
+      <button onclick="createTask()">Create Task</button>
+    </section>
+
+    <section id="tasksList">
+      <h2>All Tasks</h2>
+
+      <!-- THIS MUST EXIST (ID = taskList) -->
+      <div id="taskList">Loading...</div>
+    </section>
+  </main>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/admin.js"></script>
+
+</body>
+</html>

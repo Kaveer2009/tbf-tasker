@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // USERS - allow logged-in user to read/write their own doc
+    match /users/{userId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // TASKS collection
+    match /tasks/{taskId} {
+
+      // Admin can do everything (based on email check in code)
+      allow create, read, update, delete: if request.auth != null;
+
+      // Employees can only update tasks assigned to them
+      allow update: if request.auth != null &&
+        request.resource.data.assignedTo == request.auth.uid;
+    }
+  }
+}

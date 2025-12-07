@@ -1,0 +1,9 @@
+{
+  "name": "TaskManager",
+  "short_name": "Tasks",
+  "start_url": "/employee.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "scope": "/",
+  "icons": [{ "src":"/assets/icon-192.png","sizes":"192x192","type":"image/png" }]
+}
