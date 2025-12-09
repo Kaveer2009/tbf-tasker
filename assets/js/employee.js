@@ -1,97 +1,146 @@
+// employee.js — responsive modern employee page
+import { auth, db } from "./firebase-config.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-    getDoc, doc, updateDoc,
-    collection, query, where, orderBy, onSnapshot
+  collection, query, where, orderBy, onSnapshot, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-import { auth, db } from "./firebase-config.js";
+// UI
+const empNameEl = document.getElementById('empName');
+const empCountsEl = document.getElementById('empCounts');
+const empTasksGrid = document.getElementById('empTasksGrid');
+const empSearch = document.getElementById('empSearch');
 
-window.openModal = id => document.getElementById(id).style.display = "flex";
-window.closeModal = id => document.getElementById(id).style.display = "none";
+let currentUser = null;
+let currentConfirmId = null;
+let tasksLocal = [];
 
-let currentTaskId = null;
+// theme toggle
+document.getElementById('empTheme').onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+};
+
+document.getElementById('empLogout').onclick = () => {
+  auth.signOut().then(()=> window.location.href='login.html');
+};
 
 function fmt(v){
-    if (!v) return "—";
-    const d = v.toDate ? v.toDate() : new Date(v);
-    return d.toLocaleString();
+  if (!v) return '—';
+  try { const d = v.toDate ? v.toDate() : new Date(v); return d.toLocaleString(); } catch { return '—'; }
 }
 
-function timeLeft(deadline){
-    if (!deadline) return "—";
-    const dl = deadline.toDate ? deadline.toDate().getTime() : new Date(deadline).getTime();
-    const diff = dl - Date.now();
-    if (diff <= 0) return "Overdue";
-
-    const mins = Math.floor(diff/60000);
-    const days = Math.floor(mins/1440);
-    const hours = Math.floor((mins%1440)/60);
-    const minutes = mins%60;
-
-    return `${days}d ${hours}h ${minutes}m`;
+function timeLeftStr(deadline){
+  if (!deadline) return '—';
+  const now = Date.now();
+  const dl = deadline.toDate ? deadline.toDate().getTime() : new Date(deadline).getTime();
+  const diff = dl - now;
+  if (diff <= 0) return 'Overdue';
+  const mins = Math.floor(diff/60000);
+  const days = Math.floor(mins/1440);
+  const hours = Math.floor((mins%1440)/60);
+  const minutes = mins%60;
+  let s = '';
+  if (days) s += `${days}d `;
+  if (hours) s += `${hours}h `;
+  s += `${minutes}m`;
+  return s;
 }
 
-auth.onAuthStateChanged(async user => {
-    if (!user) return (window.location.href="login.html");
+// modal helpers
+window.openModal = id => document.getElementById(id).style.display = 'flex';
+window.closeModal = id => document.getElementById(id).style.display = 'none';
 
-    // Load name
-    const snap = await getDoc(doc(db, "users", user.uid));
-    if (snap.exists()) document.getElementById("empName").textContent = snap.data().name;
+onAuthStateChanged(auth, async user => {
+  if (!user) return window.location.href = 'login.html';
+  currentUser = user;
 
-    // Load tasks
-    const q = query(
-        collection(db, "tasks"),
-        where("assignedTo", "==", user.uid),
-        orderBy("createdAt", "desc")
-    );
+  // load name from users
+  try {
+    const ud = await getDoc(doc(db,'users',user.uid));
+    if (ud.exists()) empNameEl.textContent = ud.data().name || user.email;
+  } catch(e){ console.warn('user load',e); }
 
-    onSnapshot(q, snap => {
-        const list = document.getElementById("taskList");
-        list.innerHTML = "";
-
-        snap.forEach(taskDoc => {
-            const t = taskDoc.data();
-            const id = taskDoc.id;
-
-            const div = document.createElement("div");
-            div.innerHTML = `
-                <h3>📌 ${t.title}</h3>
-                <p>${t.description}</p>
-                <p>📅 Assigned: <b>${fmt(t.createdAt)}</b></p>
-                <p>⏳ Deadline: <b>${fmt(t.deadline)}</b></p>
-                <p>⌛ Time Left: <b>${t.status==="done"?"—":timeLeft(t.deadline)}</b></p>
-                <p>🟡 Status: ${t.status}</p>
-
-                ${
-                    t.status === "done"
-                    ? `<p>✅ Completed: <b>${fmt(t.completedAt)}</b></p>`
-                    : `<button onclick="askDone('${id}','${t.title}')" style="background:#2ecc71;color:white;padding:6px 10px;">Mark Done</button>`
-                }
-            `;
-
-            list.appendChild(div);
-        });
+  const q = query(collection(db,'tasks'), where('assignedTo','==', user.uid), orderBy('createdAt','desc'));
+  onSnapshot(q, snap => {
+    tasksLocal = [];
+    snap.forEach(s=> {
+      const d = s.data(); d.id = s.id; tasksLocal.push(d);
     });
+    renderCounts();
+    renderTasks();
+  }, err => {
+    console.error('snapshot err',err);
+    empTasksGrid.textContent = 'Error loading tasks';
+  });
 });
 
-window.askDone = function(id, title){
-    currentTaskId = id;
-    document.getElementById("doneTaskTitle").textContent = title;
-    openModal("doneModal");
+// counts and small summary
+function renderCounts(){
+  const total = tasksLocal.length;
+  const done = tasksLocal.filter(t=>t.status==='done').length;
+  const pending = total - done;
+  const overdue = tasksLocal.filter(t=>{
+    if (t.status === 'done' || !t.deadline) return false;
+    const dl = t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime();
+    return dl < Date.now();
+  }).length;
+  empCountsEl.textContent = `${total} tasks • ${pending} pending • ${done} completed • ${overdue} overdue`;
+}
+
+// render tasks grid (3/2/1 handled by CSS)
+function renderTasks(){
+  const q = empSearch.value.trim().toLowerCase();
+  const filtered = tasksLocal.filter(t => !q || (t.title && t.title.toLowerCase().includes(q)));
+  empTasksGrid.innerHTML = '';
+  if (filtered.length === 0) empTasksGrid.innerHTML = '<div class="small">No tasks assigned.</div>';
+
+  filtered.forEach(t=>{
+    const card = document.createElement('div');
+    card.className = 'task-card';
+    card.innerHTML = `
+      <div class="task-top">
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div class="avatar">${(t.title||'?').charAt(0)}</div>
+          <div>
+            <div class="task-title">${t.title}</div>
+            <div class="small">${t.description || ''}</div>
+          </div>
+        </div>
+        <div class="small">${t.status === 'done' ? '✅' : '⏳'}</div>
+      </div>
+
+      <div class="task-meta">
+        <div class="small">Created: ${fmt(t.createdAt)}</div>
+        <div class="small">Deadline: ${fmt(t.deadline)}</div>
+        <div class="small">Time left: ${ t.status === 'done' ? '—' : timeLeftStr(t.deadline) }</div>
+        ${t.status === 'done' ? `<div class="small">Completed: ${fmt(t.completedAt)}</div>` : ''}
+      </div>
+
+      <div class="task-actions">
+        ${t.status === 'done' ? `<button class="btn btn-muted" disabled>Completed</button><button class="btn btn-blue" onclick="reopenTask('${t.id}')">Re-open</button>` :
+        `<button class="btn btn-green" onclick="askComplete('${t.id}','${(t.title||'task').replace(/'/g,"\\'")}')">Mark Done</button>`}
+      </div>
+    `;
+    empTasksGrid.appendChild(card);
+  });
+}
+
+window.askComplete = function(id, title){
+  currentConfirmId = id;
+  document.getElementById('confirmText').textContent = `Are you sure you want to complete "${title}"?`;
+  openModal('confirmModal');
 };
 
-document.getElementById("confirmDoneBtn").onclick = async () => {
-    await updateDoc(doc(db, "tasks", currentTaskId), {
-        status:"done",
-        completedAt:new Date()
-    });
-    closeModal("doneModal");
+document.getElementById('confirmYes').onclick = async () => {
+  if (!currentConfirmId) return closeModal('confirmModal');
+  await updateDoc(doc(db,'tasks',currentConfirmId), { status:'done', completedAt: new Date() });
+  closeModal('confirmModal');
+  currentConfirmId = null;
 };
 
-document.getElementById("cancelDoneBtn").onclick = () => closeModal("doneModal");
+document.getElementById('confirmNo').onclick = () => { currentConfirmId = null; closeModal('confirmModal'); };
 
-// LOGOUT
-document.getElementById("logoutBtn").onclick = () => {
-    auth.signOut().then(() => {
-        window.location.href = "login.html";
-    });
+window.reopenTask = async function(id){
+  await updateDoc(doc(db,'tasks',id), { status:'pending', completedAt: null });
 };

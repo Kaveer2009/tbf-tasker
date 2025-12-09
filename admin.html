@@ -1,151 +1,130 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Admin Panel</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TaskManager — Admin</title>
 
-    <style>
-        body {
-            font-family: Arial;
-            margin: 20px;
-            background: #f5f7fb;
-        }
-        h2 { margin-bottom: 8px; font-size: 24px; }
-        .button {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            color: white;
-            margin: 5px;
-        }
-        .btn-blue { background:#3498db; }
-        .btn-green { background:#2ecc71; }
-        .btn-red { background:#e74c3c; }
-        .btn-yellow { background:#f1c40f; }
+  <!-- Chart.js for analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-        #taskList div {
-            background: white;
-            padding: 14px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-        }
-
-        .modal-bg {
-            position: fixed;
-            top:0; left:0;
-            width:100%; height:100%;
-            display:none;
-            background:#0008;
-            align-items:center; justify-content:center;
-            z-index:1000;
-        }
-        .modal {
-            background:white; width:320px;
-            padding:18px; border-radius:12px;
-        }
-        input, textarea, select {
-            width:100%; padding:8px;
-            margin:6px 0;
-            border-radius:6px;
-            border:1px solid #ccc;
-        }
-    </style>
-
+  <link rel="stylesheet" href="assets/css/style.css">
 </head>
-
 <body>
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">TM</div>
+        <div>
+          <div class="title">TaskManager — Admin</div>
+          <div class="subtitle">Professional dashboard</div>
+        </div>
+      </div>
 
-<h2>👑 Welcome, <span id="welcomeName"></span></h2>
+      <div class="controls">
+        <button id="toggleTheme" class="btn btn-muted">🌓 Theme</button>
+        <button id="openCreateTaskBtn" class="btn btn-blue">+ Task</button>
+        <button id="openAddUserBtn" class="btn btn-green">+ Employee</button>
+        <button id="logoutBtn" class="btn btn-red">Logout</button>
+      </div>
+    </header>
 
-<button id="logoutBtn" class="button btn-red">Logout</button>
-<button id="openCreateTaskBtn" class="button btn-blue">+ Task</button>
-<button id="openAddUserBtn" class="button btn-green">+ Employee</button>
+    <main class="grid">
+      <!-- left main content -->
+      <section>
+        <div class="card">
+          <div class="stats">
+            <div class="stat"><h4>Total tasks</h4><p id="totalTasks">—</p></div>
+            <div class="stat"><h4>Pending</h4><p id="pendingTasks">—</p></div>
+            <div class="stat"><h4>Completed</h4><p id="completedTasks">—</p></div>
+            <div class="stat"><h4>Overdue</h4><p id="overdueTasks">—</p></div>
+          </div>
 
-<h3 style="margin-top:25px;">📋 All Tasks</h3>
-<div id="taskList">Loading...</div>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <div style="flex:1;">
+              <input id="searchTasks" class="input" placeholder="Search tasks by title..." />
+            </div>
+            <div style="width:260px;">
+              <canvas id="tasksPie" width="260" height="120"></canvas>
+            </div>
+          </div>
+        </div>
 
+        <div class="card" style="margin-top:14px;">
+          <h3 style="margin:0 0 10px 0;">All Tasks</h3>
+          <div id="tasksGrid" class="tasks-grid"></div>
+        </div>
+      </section>
 
-<!-- ---------------- LOGOUT MODAL ---------------- -->
-<div id="logoutModal" class="modal-bg">
+      <!-- right sidebar -->
+      <aside>
+        <div class="card">
+          <h4 style="margin:0 0 8px 0;">Employees</h4>
+          <div id="employeeSidebar" class="side-list">Loading employees...</div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <h4 style="margin:0 0 8px 0;">Analytics</h4>
+          <div style="height:200px;">
+            <canvas id="tasksBar" width="320" height="200"></canvas>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Create/Edit Task Modal -->
+  <div id="taskModal" class="modal-bg">
     <div class="modal">
-        <h3>🔐 Logout?</h3>
-        <p style="margin-bottom:12px;">Are you sure you want to logout?</p>
+      <h3 id="taskModalTitle">Create Task</h3>
 
-        <button id="confirmLogout" class="button btn-red">Logout</button>
-        <button onclick="closeModal('logoutModal')" class="button btn-blue">Cancel</button>
+      <input id="taskTitle" class="input" placeholder="Title">
+      <textarea id="taskDesc" class="input" placeholder="Description"></textarea>
+
+      <div class="dropdown">
+        <input id="assignSearch" class="input" placeholder="Assign to (type to search)" autocomplete="off">
+        <input id="assignUid" type="hidden">
+        <div id="assignSuggestions" class="suggestions" style="display:none"></div>
+      </div>
+
+      <label class="small">Deadline</label>
+      <input id="taskDeadline" class="input" type="datetime-local">
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+        <button id="saveTaskBtn" class="btn btn-blue">Save</button>
+        <button onclick="closeModal('taskModal')" class="btn btn-red">Cancel</button>
+      </div>
     </div>
-</div>
+  </div>
 
-
-<!-- ---------------- CREATE TASK MODAL ---------------- -->
-<div id="createTaskModal" class="modal-bg">
+  <!-- Create Employee Modal -->
+  <div id="userModal" class="modal-bg">
     <div class="modal">
-        <h3>📝 Create Task</h3>
-        <input id="taskTitle" placeholder="Task title">
-        <textarea id="taskDesc" placeholder="Description"></textarea>
-
-        <input id="taskAssignToName" placeholder="Select Employee" readonly onclick="openEmployeePicker('create')">
-        <input id="taskAssignToUID" type="hidden">
-
-        <label>Deadline</label>
-        <input id="taskDeadline" type="datetime-local">
-
-        <button id="createTaskBtn" class="button btn-green">Create</button>
-        <button onclick="closeModal('createTaskModal')" class="button btn-red">Cancel</button>
+      <h3>Create Employee</h3>
+      <input id="newName" class="input" placeholder="Full name">
+      <input id="newEmail" class="input" placeholder="Email">
+      <input id="newPass" class="input" placeholder="Password (min 6)" type="password">
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+        <button id="createUserBtn" class="btn btn-green">Create</button>
+        <button onclick="closeModal('userModal')" class="btn btn-red">Cancel</button>
+      </div>
     </div>
-</div>
+  </div>
 
-
-<!-- ---------------- EDIT TASK MODAL ---------------- -->
-<div id="editTaskModal" class="modal-bg">
+  <!-- Logout confirm -->
+  <div id="logoutModal" class="modal-bg">
     <div class="modal">
-        <h3>✏️ Edit Task</h3>
-
-        <input id="editTitle">
-        <textarea id="editDesc"></textarea>
-
-        <input id="editAssignToName" readonly onclick="openEmployeePicker('edit')">
-        <input id="editAssignToUID" type="hidden">
-
-        <label>Deadline</label>
-        <input id="editDeadline" type="datetime-local">
-
-        <button id="saveTaskEditBtn" class="button btn-yellow">Save</button>
-        <button onclick="closeModal('editTaskModal')" class="button btn-red">Cancel</button>
+      <h3>Logout</h3>
+      <p class="small">Are you sure you want to logout?</p>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+        <button id="confirmLogout" class="btn btn-red">Logout</button>
+        <button onclick="closeModal('logoutModal')" class="btn btn-blue">Cancel</button>
+      </div>
     </div>
-</div>
+  </div>
 
-
-<!-- ---------------- ADD EMPLOYEE MODAL ---------------- -->
-<div id="addUserModal" class="modal-bg">
-    <div class="modal">
-        <h3>👤 Add Employee</h3>
-        <input id="newUserName" placeholder="Name">
-        <input id="newUserEmail" placeholder="Email">
-        <input id="newUserPassword" placeholder="Password" type="password">
-
-        <button id="createUserBtn" class="button btn-green">Create Employee</button>
-        <button onclick="closeModal('addUserModal')" class="button btn-red">Cancel</button>
-    </div>
-</div>
-
-
-<!-- ---------------- EMPLOYEE PICKER MODAL ---------------- -->
-<div id="employeePickerModal" class="modal-bg">
-    <div class="modal">
-        <h3>👥 Select Employee</h3>
-
-        <input id="employeeSearch" oninput="filterEmployees()" placeholder="Search employee...">
-
-        <div id="employeePickerList" style="max-height:200px;overflow:auto;margin-top:10px;"></div>
-
-        <button onclick="closeModal('employeePickerModal')" class="button btn-red">Close</button>
-    </div>
-</div>
-
-
-<script type="module" src="assets/js/admin.js"></script>
-
+  <script type="module" src="assets/js/admin.js"></script>
 </body>
 </html>

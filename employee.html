@@ -1,48 +1,59 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Employee Panel</title>
-    <style>
-        body { font-family: Arial; margin: 20px; background:#f4f6fb; }
-        #taskList div {
-            background:white; padding:12px; border-radius:10px;
-            margin:10px 0; box-shadow:0 4px 12px rgba(0,0,0,0.08);
-        }
-        .modal-bg { position:fixed; top:0; left:0; width:100%; height:100%;
-                    background:#0007; display:none;
-                    align-items:center; justify-content:center; }
-        .modal { background:white; padding:20px; border-radius:12px; width:300px; }
-        .button {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            color: white;
-            margin: 5px;
-        }
-        .btn-red { background:#e74c3c; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TaskManager — Employee</title>
+  <link rel="stylesheet" href="assets/css/style.css">
 </head>
-
 <body>
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">TM</div>
+        <div>
+          <div class="title" id="empTitle">Tasks</div>
+          <div class="subtitle small" id="empSub">Your tasks & progress</div>
+        </div>
+      </div>
 
-<h2>👋 Welcome, <span id="empName"></span></h2>
-<button id="logoutBtn" class="button btn-red">Logout</button>
-<h3>📋 Your Tasks</h3>
-<div id="taskList">Loading...</div>
+      <div class="controls">
+        <button id="empTheme" class="btn btn-muted">🌓 Theme</button>
+        <button id="empLogout" class="btn btn-red">Logout</button>
+      </div>
+    </header>
 
+    <main>
+      <div class="card">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div style="flex:1">
+            <div class="small">Hello, <b id="empName">Employee</b></div>
+            <div class="small" id="empCounts">—</div>
+          </div>
+          <div style="min-width:220px">
+            <input id="empSearch" class="input" placeholder="Search your tasks...">
+          </div>
+        </div>
+      </div>
 
-<!-- Confirm modal -->
-<div id="doneModal" class="modal-bg">
- <div class="modal">
-    <h3>✅ Complete Task?</h3>
-    <p id="doneTaskTitle"></p>
+      <div style="margin-top:12px;">
+        <div id="empTasksGrid" class="tasks-grid"></div>
+      </div>
+    </main>
+  </div>
 
-    <button id="confirmDoneBtn" style="background:#2ecc71;color:white;padding:8px 12px;">Confirm</button>
-    <button id="cancelDoneBtn" style="background:#e74c3c;color:white;padding:8px 12px;">Cancel</button>
- </div>
-</div>
+  <!-- confirm modal -->
+  <div id="confirmModal" class="modal-bg">
+    <div class="modal">
+      <h3>Complete Task</h3>
+      <div id="confirmText" class="small"></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+        <button id="confirmYes" class="btn btn-green">Yes</button>
+        <button id="confirmNo" class="btn btn-red">Cancel</button>
+      </div>
+    </div>
+  </div>
 
-<script type="module" src="assets/js/employee.js"></script>
+  <script type="module" src="assets/js/employee.js"></script>
 </body>
 </html>
