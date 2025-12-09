@@ -1,72 +1,97 @@
+import {
+    getDoc, doc, updateDoc,
+    collection, query, where, orderBy, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
 import { auth, db } from "./firebase-config.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const taskListDiv = document.getElementById("taskList");
-const logoutBtn = document.getElementById("logoutBtn");
+window.openModal = id => document.getElementById(id).style.display = "flex";
+window.closeModal = id => document.getElementById(id).style.display = "none";
 
-onAuthStateChanged(auth, user => {
-  if (!user) {
-    window.location.href="login.html";
-    return;
-  }
-  loadTasks(user.uid);
-});
+let currentTaskId = null;
 
-logoutBtn.addEventListener("click", () => {
-  signOut(auth).then(() => window.location.href="login.html");
-});
-
-function formatTimeLeft(deadline) {
-  const now = new Date();
-  const diff = deadline - now;
-  if (diff <= 0) return "Expired";
-  const days = Math.floor(diff/1000/60/60/24);
-  const hours = Math.floor((diff/1000/60/60) % 24);
-  const minutes = Math.floor((diff/1000/60) % 60);
-  return `${days}d ${hours}h ${minutes}m`;
+function fmt(v){
+    if (!v) return "—";
+    const d = v.toDate ? v.toDate() : new Date(v);
+    return d.toLocaleString();
 }
 
-function loadTasks(uid) {
-  const q = query(collection(db, "tasks"), where("assignedTo","==",uid), orderBy("createdAt","desc"));
-  onSnapshot(q, snapshot => {
-    taskListDiv.innerHTML = "";
-    snapshot.forEach(docSnap => {
-      const t = docSnap.data();
-      const id = docSnap.id;
-      const deadlineDate = t.deadline?.toDate ? t.deadline.toDate() : new Date(t.deadline);
-      const div = document.createElement("div");
+function timeLeft(deadline){
+    if (!deadline) return "—";
+    const dl = deadline.toDate ? deadline.toDate().getTime() : new Date(deadline).getTime();
+    const diff = dl - Date.now();
+    if (diff <= 0) return "Overdue";
 
-      div.innerHTML = `
-        <h3>${t.title}</h3>
-        <p>${t.description}</p>
-        <p><b>Status:</b> ${t.status}</p>
-        <p><b>Assigned:</b> ${t.createdAt?.toDate ? t.createdAt.toDate().toLocaleString() : "N/A"}</p>
-        <p><b>Deadline:</b> ${deadlineDate.toLocaleString()}</p>
-        <p><b>Time Left:</b> ${formatTimeLeft(deadlineDate)}</p>
-      `;
+    const mins = Math.floor(diff/60000);
+    const days = Math.floor(mins/1440);
+    const hours = Math.floor((mins%1440)/60);
+    const minutes = mins%60;
 
-      if (t.status !== "done") {
-        const btn = document.createElement("button");
-        btn.textContent = "Mark as Done";
-        btn.addEventListener("click", async () => {
-          await updateDoc(doc(db, "tasks", id), { status: "done" });
+    return `${days}d ${hours}h ${minutes}m`;
+}
+
+auth.onAuthStateChanged(async user => {
+    if (!user) return (window.location.href="login.html");
+
+    // Load name
+    const snap = await getDoc(doc(db, "users", user.uid));
+    if (snap.exists()) document.getElementById("empName").textContent = snap.data().name;
+
+    // Load tasks
+    const q = query(
+        collection(db, "tasks"),
+        where("assignedTo", "==", user.uid),
+        orderBy("createdAt", "desc")
+    );
+
+    onSnapshot(q, snap => {
+        const list = document.getElementById("taskList");
+        list.innerHTML = "";
+
+        snap.forEach(taskDoc => {
+            const t = taskDoc.data();
+            const id = taskDoc.id;
+
+            const div = document.createElement("div");
+            div.innerHTML = `
+                <h3>📌 ${t.title}</h3>
+                <p>${t.description}</p>
+                <p>📅 Assigned: <b>${fmt(t.createdAt)}</b></p>
+                <p>⏳ Deadline: <b>${fmt(t.deadline)}</b></p>
+                <p>⌛ Time Left: <b>${t.status==="done"?"—":timeLeft(t.deadline)}</b></p>
+                <p>🟡 Status: ${t.status}</p>
+
+                ${
+                    t.status === "done"
+                    ? `<p>✅ Completed: <b>${fmt(t.completedAt)}</b></p>`
+                    : `<button onclick="askDone('${id}','${t.title}')" style="background:#2ecc71;color:white;padding:6px 10px;">Mark Done</button>`
+                }
+            `;
+
+            list.appendChild(div);
         });
-        div.appendChild(btn);
-      } else {
-        const doneSpan = document.createElement("span");
-        doneSpan.textContent = "✔ Completed";
-        doneSpan.style.color="green";
-        doneSpan.style.fontWeight="bold";
-        div.appendChild(doneSpan);
-      }
-
-      div.style.border="1px solid #aaa";
-      div.style.padding="10px";
-      div.style.margin="10px 0";
-      div.style.borderRadius="6px";
-
-      taskListDiv.appendChild(div);
     });
-  });
-}
+});
+
+window.askDone = function(id, title){
+    currentTaskId = id;
+    document.getElementById("doneTaskTitle").textContent = title;
+    openModal("doneModal");
+};
+
+document.getElementById("confirmDoneBtn").onclick = async () => {
+    await updateDoc(doc(db, "tasks", currentTaskId), {
+        status:"done",
+        completedAt:new Date()
+    });
+    closeModal("doneModal");
+};
+
+document.getElementById("cancelDoneBtn").onclick = () => closeModal("doneModal");
+
+// LOGOUT
+document.getElementById("logoutBtn").onclick = () => {
+    auth.signOut().then(() => {
+        window.location.href = "login.html";
+    });
+};

@@ -1,30 +1,151 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TaskManager — Admin</title>
-<link rel="stylesheet" href="assets/css/style.css">
-<script type="module" src="assets/js/admin.js"></script>
+    <title>Admin Panel</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            margin: 20px;
+            background: #f5f7fb;
+        }
+        h2 { margin-bottom: 8px; font-size: 24px; }
+        .button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            margin: 5px;
+        }
+        .btn-blue { background:#3498db; }
+        .btn-green { background:#2ecc71; }
+        .btn-red { background:#e74c3c; }
+        .btn-yellow { background:#f1c40f; }
+
+        #taskList div {
+            background: white;
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        .modal-bg {
+            position: fixed;
+            top:0; left:0;
+            width:100%; height:100%;
+            display:none;
+            background:#0008;
+            align-items:center; justify-content:center;
+            z-index:1000;
+        }
+        .modal {
+            background:white; width:320px;
+            padding:18px; border-radius:12px;
+        }
+        input, textarea, select {
+            width:100%; padding:8px;
+            margin:6px 0;
+            border-radius:6px;
+            border:1px solid #ccc;
+        }
+    </style>
+
 </head>
+
 <body>
-<main class="container">
-  <h1>Admin — TaskManager</h1>
-  <button id="logoutBtn">Logout</button>
 
-  <section id="createTask">
-    <h2>Create Task</h2>
-    <input id="taskTitle" placeholder="Task title">
-    <textarea id="taskDescription" placeholder="Description"></textarea>
-    <input id="assignedTo" placeholder="Assign to (user UID)">
-    <input type="datetime-local" id="deadline">
-    <button id="createBtn">Create Task</button>
-  </section>
+<h2>👑 Welcome, <span id="welcomeName"></span></h2>
 
-  <section id="tasksList">
-    <h2>All Tasks</h2>
-    <div id="taskList">Loading...</div>
-  </section>
-</main>
+<button id="logoutBtn" class="button btn-red">Logout</button>
+<button id="openCreateTaskBtn" class="button btn-blue">+ Task</button>
+<button id="openAddUserBtn" class="button btn-green">+ Employee</button>
+
+<h3 style="margin-top:25px;">📋 All Tasks</h3>
+<div id="taskList">Loading...</div>
+
+
+<!-- ---------------- LOGOUT MODAL ---------------- -->
+<div id="logoutModal" class="modal-bg">
+    <div class="modal">
+        <h3>🔐 Logout?</h3>
+        <p style="margin-bottom:12px;">Are you sure you want to logout?</p>
+
+        <button id="confirmLogout" class="button btn-red">Logout</button>
+        <button onclick="closeModal('logoutModal')" class="button btn-blue">Cancel</button>
+    </div>
+</div>
+
+
+<!-- ---------------- CREATE TASK MODAL ---------------- -->
+<div id="createTaskModal" class="modal-bg">
+    <div class="modal">
+        <h3>📝 Create Task</h3>
+        <input id="taskTitle" placeholder="Task title">
+        <textarea id="taskDesc" placeholder="Description"></textarea>
+
+        <input id="taskAssignToName" placeholder="Select Employee" readonly onclick="openEmployeePicker('create')">
+        <input id="taskAssignToUID" type="hidden">
+
+        <label>Deadline</label>
+        <input id="taskDeadline" type="datetime-local">
+
+        <button id="createTaskBtn" class="button btn-green">Create</button>
+        <button onclick="closeModal('createTaskModal')" class="button btn-red">Cancel</button>
+    </div>
+</div>
+
+
+<!-- ---------------- EDIT TASK MODAL ---------------- -->
+<div id="editTaskModal" class="modal-bg">
+    <div class="modal">
+        <h3>✏️ Edit Task</h3>
+
+        <input id="editTitle">
+        <textarea id="editDesc"></textarea>
+
+        <input id="editAssignToName" readonly onclick="openEmployeePicker('edit')">
+        <input id="editAssignToUID" type="hidden">
+
+        <label>Deadline</label>
+        <input id="editDeadline" type="datetime-local">
+
+        <button id="saveTaskEditBtn" class="button btn-yellow">Save</button>
+        <button onclick="closeModal('editTaskModal')" class="button btn-red">Cancel</button>
+    </div>
+</div>
+
+
+<!-- ---------------- ADD EMPLOYEE MODAL ---------------- -->
+<div id="addUserModal" class="modal-bg">
+    <div class="modal">
+        <h3>👤 Add Employee</h3>
+        <input id="newUserName" placeholder="Name">
+        <input id="newUserEmail" placeholder="Email">
+        <input id="newUserPassword" placeholder="Password" type="password">
+
+        <button id="createUserBtn" class="button btn-green">Create Employee</button>
+        <button onclick="closeModal('addUserModal')" class="button btn-red">Cancel</button>
+    </div>
+</div>
+
+
+<!-- ---------------- EMPLOYEE PICKER MODAL ---------------- -->
+<div id="employeePickerModal" class="modal-bg">
+    <div class="modal">
+        <h3>👥 Select Employee</h3>
+
+        <input id="employeeSearch" oninput="filterEmployees()" placeholder="Search employee...">
+
+        <div id="employeePickerList" style="max-height:200px;overflow:auto;margin-top:10px;"></div>
+
+        <button onclick="closeModal('employeePickerModal')" class="button btn-red">Close</button>
+    </div>
+</div>
+
+
+<script type="module" src="assets/js/admin.js"></script>
+
 </body>
 </html>

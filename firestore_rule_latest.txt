@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Anyone logged-in can read/write ONLY their own tasks
+    match /tasks/{taskId} {
+      allow read, update: if request.auth != null
+                           && request.auth.uid == resource.data.assignedTo;
+
+      // Admins → allow them full access
+      allow read, write: if request.auth.token.email == "kaveer.is.king@gmail.com";
+    }
+
+    // Allow admin to read users collection
+    match /users/{userId} {
+      allow read, write: if request.auth.token.email == "kaveer.is.king@gmail.com";
+    }
+  }
+}
+
+
+
+///////
+
+
+
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Function to check admin status
+    function isAdmin() {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // USERS Collection
+    match /users/{userId} {
+
+      // Admin full access (create employees, read all users)
+      allow read, write: if isAdmin();
+
+      // Users may read their own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // TASKS Collection
+    match /tasks/{taskId} {
+
+      // Admin can read/write/delete all tasks
+      allow read, write: if isAdmin();
+
+      // Employee can read only their assigned tasks
+      allow read: if request.auth != null &&
+                   resource.data.assignedTo == request.auth.uid;
+
+      // Employee can update (mark done) only their own tasks
+      allow update: if request.auth != null &&
+                     request.resource.data.assignedTo == request.auth.uid;
+    }
+  }
+}
+
