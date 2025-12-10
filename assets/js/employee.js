@@ -1,4 +1,4 @@
-// employee.js — responsive modern employee page
+// employee.js — updated to display location + search by location + colored cards
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
@@ -16,14 +16,14 @@ let currentConfirmId = null;
 let tasksLocal = [];
 
 // theme toggle
-document.getElementById('empTheme').onclick = () => {
+const empThemeBtn = document.getElementById('empTheme');
+if (empThemeBtn) empThemeBtn.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme');
   document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
 };
 
-document.getElementById('empLogout').onclick = () => {
-  auth.signOut().then(()=> window.location.href='login.html');
-};
+const empLogoutBtn = document.getElementById('empLogout');
+if (empLogoutBtn) empLogoutBtn.onclick = () => { auth.signOut().then(()=> window.location.href='login.html'); };
 
 function fmt(v){
   if (!v) return '—';
@@ -91,20 +91,37 @@ function renderCounts(){
 // render tasks grid (3/2/1 handled by CSS)
 function renderTasks(){
   const q = empSearch.value.trim().toLowerCase();
-  const filtered = tasksLocal.filter(t => !q || (t.title && t.title.toLowerCase().includes(q)));
+  const filtered = tasksLocal.filter(t => {
+    if (!q) return true;
+    const title = (t.title||'').toLowerCase();
+    const desc = (t.description||'').toLowerCase();
+    const loc = (t.location||'').toLowerCase();
+    return title.includes(q) || desc.includes(q) || loc.includes(q);
+  });
+
   empTasksGrid.innerHTML = '';
   if (filtered.length === 0) empTasksGrid.innerHTML = '<div class="small">No tasks assigned.</div>';
 
   filtered.forEach(t=>{
+    // determine bg color
+    const now = Date.now();
+    const isOverdue = (t.status !== 'done' && t.deadline && ((t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime()) < now));
+    let bgStyle = '';
+    if (t.status === 'done') bgStyle = 'background:#e7ffea;';
+    else if (isOverdue) bgStyle = 'background:#ffecec;';
+
+    const locHtml = t.location ? `<div class="small"><b>Location:</b><pre style="white-space:pre-wrap;margin:6px 0 0 0;">${escapeHtml(t.location)}</pre></div>` : '';
+
     const card = document.createElement('div');
     card.className = 'task-card';
+    card.setAttribute('style', bgStyle);
     card.innerHTML = `
       <div class="task-top">
         <div style="display:flex;gap:10px;align-items:center;">
           <div class="avatar">${(t.title||'?').charAt(0)}</div>
           <div>
-            <div class="task-title">${t.title}</div>
-            <div class="small">${t.description || ''}</div>
+            <div class="task-title">${escapeHtml(t.title)}</div>
+            <div class="small">${escapeHtml(t.description || '')}</div>
           </div>
         </div>
         <div class="small">${t.status === 'done' ? '✅' : '⏳'}</div>
@@ -115,6 +132,7 @@ function renderTasks(){
         <div class="small">Deadline: ${fmt(t.deadline)}</div>
         <div class="small">Time left: ${ t.status === 'done' ? '—' : timeLeftStr(t.deadline) }</div>
         ${t.status === 'done' ? `<div class="small">Completed: ${fmt(t.completedAt)}</div>` : ''}
+        ${locHtml}
       </div>
 
       <div class="task-actions">
@@ -124,6 +142,12 @@ function renderTasks(){
     `;
     empTasksGrid.appendChild(card);
   });
+}
+
+// simple helper
+function escapeHtml(s){
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
 window.askComplete = function(id, title){
@@ -144,3 +168,6 @@ document.getElementById('confirmNo').onclick = () => { currentConfirmId = null; 
 window.reopenTask = async function(id){
   await updateDoc(doc(db,'tasks',id), { status:'pending', completedAt: null });
 };
+
+// search triggers
+if (empSearch) empSearch.oninput = renderTasks;

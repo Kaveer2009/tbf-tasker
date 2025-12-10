@@ -42,7 +42,7 @@
 
           <div style="display:flex; gap:12px; align-items:center;">
             <div style="flex:1;">
-              <input id="searchTasks" class="input" placeholder="Search tasks by title..." />
+              <input id="searchTasks" class="input" placeholder="Search tasks by title, name or location..." />
             </div>
             <div style="width:260px;">
               <canvas id="tasksPie" width="260" height="120"></canvas>
@@ -88,6 +88,9 @@
         <input id="assignUid" type="hidden">
         <div id="assignSuggestions" class="suggestions" style="display:none"></div>
       </div>
+
+      <label class="small">Location (multiple lines allowed)</label>
+      <textarea id="taskLocation" class="input" placeholder="e.g. Beside the conference room wall&#10;Below the wardrobe"></textarea>
 
       <label class="small">Deadline</label>
       <input id="taskDeadline" class="input" type="datetime-local">

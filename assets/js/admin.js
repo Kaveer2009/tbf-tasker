@@ -1,10 +1,8 @@
-// admin.js — modern responsive admin panel (modular Firebase v10)
-// NO duplicate imports
+// admin.js — updated: adds 'location' field + search by name/location + colored cards
 import {
   collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc,
   onSnapshot, orderBy, query, where, setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
 
 import { auth, db } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -37,6 +35,7 @@ const assignSearch = document.getElementById("assignSearch");
 const assignSuggestions = document.getElementById("assignSuggestions");
 const assignUid = document.getElementById("assignUid");
 const saveTaskBtn = document.getElementById("saveTaskBtn");
+const taskLocationEl = document.getElementById("taskLocation");
 
 const userModal = document.getElementById("userModal");
 const createUserBtn = document.getElementById("createUserBtn");
@@ -65,7 +64,7 @@ function safeInput(v){
 
 // theme toggle
 const themeToggle = document.getElementById("toggleTheme");
-themeToggle.onclick = () => {
+if (themeToggle) themeToggle.onclick = () => {
   const cur = document.documentElement.getAttribute("data-theme");
   document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
 };
@@ -93,6 +92,7 @@ function attachEvents(){
     document.getElementById("taskDesc").value = "";
     assignSearch.value = "";
     assignUid.value = "";
+    taskLocationEl.value = "";
     document.getElementById("taskDeadline").value = "";
     assignSuggestions.style.display = "none";
     openModal("taskModal");
@@ -120,8 +120,6 @@ function attachEvents(){
 
   // search tasks quick filter
   searchTasks.oninput = renderTasks; // re-render with filter
-
-  // cancel modals - close via closeModal inline buttons
 }
 
 // load employees list
@@ -202,70 +200,117 @@ function computeStats(){
   overdueTasks.textContent = overdue;
 }
 
-// render tasks grid with filter
-function renderTasks(){
+// render tasks grid with filter (search by title, description, employee name, location)
+function renderTasks() {
   const q = searchTasks.value.trim().toLowerCase();
-  const filtered = tasksCache.filter(t => !q || (t.title && t.title.toLowerCase().includes(q)));
-  tasksGrid.innerHTML = "";
-  if (filtered.length === 0) tasksGrid.innerHTML = "<div class='small'>No tasks</div>";
+  const filtered = tasksCache.filter(t => {
+    if (!q) return true;
+    const title = (t.title || '').toLowerCase();
+    const desc = (t.description || '').toLowerCase();
+    const loc = (t.location || '').toLowerCase();
+    const emp = employees.find(e => e.uid === t.assignedTo);
+    const name = emp ? emp.name.toLowerCase() : '';
+    return title.includes(q) || desc.includes(q) || loc.includes(q) || name.includes(q);
+  });
 
-  filtered.forEach(t=>{
-    const emp = employees.find(e=>e.uid === t.assignedTo);
-    const assignedName = emp ? emp.name : (t.assignedTo || 'Unassigned');
-    const card = document.createElement('div');
-    card.className = 'task-card';
+  tasksGrid.innerHTML = "";
+  if (filtered.length === 0) {
+    tasksGrid.innerHTML = "<div class='small'>No tasks</div>";
+    return;
+  }
+
+  filtered.forEach(t => {
+    const emp = employees.find(e => e.uid === t.assignedTo);
+    const assignedName = emp ? emp.name : "Unknown";
+
+    // background colors
+    const now = Date.now();
+    const deadlineMs = t.deadline ? (t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime()) : null;
+    const isOverdue = t.status !== "done" && deadlineMs && deadlineMs < now;
+
+    let bg = "";
+    if (t.status === "done") bg = "background:#e7ffea;";
+    else if (isOverdue) bg = "background:#ffecec;";
+
+    const card = document.createElement("div");
+    card.className = "task-card";
+    card.setAttribute("style", bg);
+
+    const locationHtml = t.location
+      ? `<div class="small"><b>Location:</b><pre style="white-space:pre-wrap;margin:6px 0 0 0;">${escapeHtml(t.location)}</pre></div>`
+      : "";
+
     card.innerHTML = `
       <div class="task-top">
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div style="display:flex;gap:10px;align-items:center;">
           <div class="avatar">${assignedName.charAt(0)}</div>
           <div>
-            <div class="task-title">${t.title}</div>
-            <div class="small">${assignedName}</div>
+            <div class="task-title">${escapeHtml(t.title)}</div>
+            <div class="small">${escapeHtml(t.description || '')}</div>
+
+            <!-- 👇 ADDED EMPLOYEE NAME HERE -->
+            <div class="small" style="margin-top:4px; color:#555;">
+              👤 Assigned to: <b>${assignedName}</b>
+            </div>
           </div>
         </div>
-        <div class="small">${t.status === 'done' ? '✅' : '⏳'}</div>
+
+        <div class="small">${t.status === "done" ? "✅" : "⏳"}</div>
       </div>
 
       <div class="task-meta">
-        ${t.description || ''}<br>
-        <span class="small">Created: ${fmt(t.createdAt)} • Deadline: ${fmt(t.deadline)}</span>
+        <div class="small">Created: ${fmt(t.createdAt)} • Deadline: ${fmt(t.deadline)}</div>
+        ${locationHtml}
       </div>
 
       <div class="task-actions">
-        <button class="btn btn-blue" data-id="${t.id}" onclick="editTask('${t.id}')">Edit</button>
-        <button class="btn btn-red" data-id="${t.id}" onclick="deleteTask('${t.id}')">Delete</button>
-        ${t.status === 'done' ? `<button class="btn btn-green" onclick="reopenTask('${t.id}')">Reopen</button>` : `<button class="btn btn-green" onclick="markDoneConfirm('${t.id}')">Mark Done</button>`}
+        <button class="btn btn-blue" onclick="editTask('${t.id}')">Edit</button>
+        <button class="btn btn-red" onclick="deleteTask('${t.id}')">Delete</button>
+        ${
+          t.status === 'done'
+            ? `<button class="btn btn-green" onclick="reopenTask('${t.id}')">Re-open</button>`
+            : `<button class="btn btn-green" onclick="markDoneConfirm('${t.id}')">Mark Done</button>`
+        }
       </div>
     `;
+
     tasksGrid.appendChild(card);
   });
 }
 
-// save/create task
+
+// utility: escape html for safety in innerHTML
+function escapeHtml(s){
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// save/create task (includes location)
 async function saveTask(){
   const title = document.getElementById('taskTitle').value.trim();
   const desc = document.getElementById('taskDesc').value.trim();
   const assigned = assignUid.value;
   const deadline = document.getElementById('taskDeadline').value;
+  const location = taskLocationEl.value.trim();
 
   if (!title || !assigned) return alert('Please enter title and select employee.');
 
   if (editingTaskId){
     await updateDoc(doc(db,'tasks',editingTaskId), {
-      title, description: desc, assignedTo: assigned, deadline: deadline ? new Date(deadline) : null
+      title, description: desc, assignedTo: assigned, deadline: deadline ? new Date(deadline) : null, location: location || null
     });
     editingTaskId = null;
   } else {
     await addDoc(collection(db,'tasks'), {
       title, description: desc, assignedTo: assigned,
       createdAt: new Date(), deadline: deadline ? new Date(deadline) : null,
-      status: 'pending', completedAt: null
+      status: 'pending', completedAt: null, location: location || null
     });
   }
   closeModal('taskModal');
 }
 
-// edit task - open modal and prefill
+// edit task - open modal and prefill (includes location)
 window.editTask = async function(id){
   editingTaskId = id;
   const snap = await getDoc(doc(db,'tasks',id));
@@ -276,6 +321,7 @@ window.editTask = async function(id){
   assignSearch.value = emp ? emp.name : '';
   assignUid.value = t.assignedTo || '';
   document.getElementById('taskDeadline').value = safeInput(t.deadline);
+  taskLocationEl.value = t.location || '';
   taskModalTitle.textContent = "Edit Task";
   openModal('taskModal');
 };
