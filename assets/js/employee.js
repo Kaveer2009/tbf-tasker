@@ -1,4 +1,4 @@
-// employee.js — THE ONLY FULLY CORRECT VERSION
+// employee.js — FINAL VERSION WITH FILTER TABS
 //------------------------------------------------------------
 import {
   collection, query, where, orderBy,
@@ -28,6 +28,9 @@ const empCountsEl = document.getElementById("empCounts");
 const empTasksGrid = document.getElementById("empTasksGrid");
 const empSearch = document.getElementById("empSearch");
 
+const tabsParent = document.getElementById("empTabs");
+let currentTab = "all";
+
 const detailTitleEl = document.getElementById("detailTitle");
 const detailDescEl = document.getElementById("detailDesc");
 const detailMetaEl = document.getElementById("detailMeta");
@@ -40,7 +43,7 @@ const confirmYesBtn = document.getElementById("confirmYes");
 const confirmNoBtn = document.getElementById("confirmNo");
 
 //------------------------------------------------------------
-// FIXED THEME + LOGOUT (MATCHES YOUR HTML IDs)
+// THEME + LOGOUT
 //------------------------------------------------------------
 document.getElementById("toggleTheme").onclick = () => {
   const cur = document.documentElement.getAttribute("data-theme");
@@ -75,7 +78,7 @@ let CURRENT_TASK_ID = null;
 let tasksLocal = [];
 
 //------------------------------------------------------------
-// AUTH + REAL-TIME TASK FETCH
+// AUTH + REALTIME
 //------------------------------------------------------------
 onAuthStateChanged(auth, async user => {
   if (!user) return (window.location.href = "login.html");
@@ -91,11 +94,7 @@ onAuthStateChanged(auth, async user => {
 
   onSnapshot(q, snap => {
     tasksLocal = [];
-    snap.forEach(s => {
-      const d = s.data();
-      d.id = s.id;
-      tasksLocal.push(d);
-    });
+    snap.forEach(s => tasksLocal.push({ id: s.id, ...s.data() }));
 
     updateEmployeeCounts(tasksLocal);
     renderTasks();
@@ -103,7 +102,7 @@ onAuthStateChanged(auth, async user => {
 });
 
 //------------------------------------------------------------
-// UPDATE COUNTS (works now)
+// EMPLOYEE COUNTS
 //------------------------------------------------------------
 function updateEmployeeCounts(tasks) {
   const total = tasks.length;
@@ -121,27 +120,49 @@ function updateEmployeeCounts(tasks) {
 }
 
 //------------------------------------------------------------
-// SEARCH FIX — NOW WORKS
+// SEARCH EVENT
 //------------------------------------------------------------
 empSearch.oninput = () => renderTasks();
 
 //------------------------------------------------------------
-// RENDER TASKS
+// TAB FILTER CLICK
+//------------------------------------------------------------
+tabsParent.querySelectorAll(".tab").forEach(btn => {
+  btn.onclick = () => {
+    tabsParent.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentTab = btn.dataset.tab;
+    renderTasks();
+  };
+});
+
+//------------------------------------------------------------
+// MAIN RENDER FUNCTION (SEARCH + TABS)
 //------------------------------------------------------------
 function renderTasks() {
   const q = empSearch.value.trim().toLowerCase();
 
-  const list = tasksLocal.filter(t => {
-    return (
-      (t.title || "").toLowerCase().includes(q) ||
-      (t.description || "").toLowerCase().includes(q) ||
-      (t.location || "").toLowerCase().includes(q)
-    );
-  });
+  let list = tasksLocal.filter(t =>
+    (t.title || "").toLowerCase().includes(q) ||
+    (t.description || "").toLowerCase().includes(q) ||
+    (t.location || "").toLowerCase().includes(q)
+  );
+
+  // TAB FILTERING
+  if (currentTab === "pending") list = list.filter(t => t.status !== "done");
+  if (currentTab === "completed") list = list.filter(t => t.status === "done");
+  if (currentTab === "overdue") {
+    list = list.filter(t => {
+      if (!t.deadline || t.status === "done") return false;
+      const dl = t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime();
+      return dl < Date.now();
+    });
+  }
+  if (currentTab === "recurring") list = list.filter(t => t.recurrence);
 
   empTasksGrid.innerHTML = "";
   if (!list.length) {
-    empTasksGrid.innerHTML = "<div class='small'>No tasks assigned.</div>";
+    empTasksGrid.innerHTML = "<div class='small'>No tasks found.</div>";
     return;
   }
 
@@ -157,7 +178,6 @@ function renderTasks() {
 
     const card = document.createElement("div");
     card.className = "task-card";
-
     card.style.background =
       t.status === "done" ? "#e7ffea" :
       overdue ? "#ffecec" : "white";
@@ -171,6 +191,7 @@ function renderTasks() {
           <div class="small" style="margin-top:6px;">
             ⏳ Deadline: <b>${fmt(t.deadline)}</b><br>
             ${t.status === "done" ? `✅ Completed: <b>${fmt(t.completedAt)}</b>` : ""}
+            ${t.recurrence ? `<br>🔁 <b>${t.recurrence}</b>` : ""}
           </div>
 
           <div class="progress-bar" style="margin-top:10px;">
@@ -191,9 +212,9 @@ function renderTasks() {
 }
 
 //------------------------------------------------------------
-// OPEN DETAIL MODAL
+// DETAIL MODAL + SUBTASK LOGIC
 //------------------------------------------------------------
-window.openTaskDetailLocal = async (id) => {
+window.openTaskDetailLocal = async id => {
   const snap = await getDoc(doc(db, "tasks", id));
   if (!snap.exists()) return alert("Task missing");
 
@@ -217,7 +238,7 @@ window.openTaskDetailLocal = async (id) => {
     const row = document.createElement("div");
     row.innerHTML = `
       <input type="checkbox" data-i="${i}" ${s.done ? "checked" : ""}>
-      <span style="margin-left:8px; ${s.done ? "text-decoration:line-through;" : ""}">
+      <span style="margin-left:8px;${s.done ? "text-decoration:line-through;" : ""}">
         ${escapeHtml(s.text)}
       </span>
     `;
@@ -239,7 +260,7 @@ window.openTaskDetailLocal = async (id) => {
 };
 
 //------------------------------------------------------------
-// UPDATE SUBTASK
+// SUBTASK UPDATE
 //------------------------------------------------------------
 async function updateSubtaskState(id) {
   const snap = await getDoc(doc(db, "tasks", id));
@@ -273,10 +294,12 @@ async function updateSubtaskState(id) {
 //------------------------------------------------------------
 confirmYesBtn.onclick = async () => {
   if (!CURRENT_TASK_ID) return;
+
   await updateDoc(doc(db, "tasks", CURRENT_TASK_ID), {
     status: "done",
     completedAt: new Date()
   });
+
   CURRENT_TASK_ID = null;
   closeModal("confirmModal");
   closeModal("taskDetailModal");

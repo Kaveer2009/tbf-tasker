@@ -13,6 +13,11 @@
     .admin-subtask { display:flex; align-items:center; gap:8px; padding:8px; border-bottom:1px solid #f1f1f1;}
     .admin-subtask .txt { flex:1; color:#333; }
     .admin-subtask .txt.done { text-decoration:line-through; color:#777; }
+
+    /* tiny styles for tabs (you may already have them in style.css; redundant is fine) */
+    .task-tabs { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .task-tabs .tab { padding:7px 12px; border-radius:8px; background:var(--card-bg); border:1px solid var(--glass-border); cursor:pointer; font-size:13px; }
+    .task-tabs .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   </style>
 </head>
 
@@ -48,6 +53,14 @@
           <div style="display:flex; gap:12px; align-items:center;">
             <div style="flex:1;">
               <input id="searchTasks" class="input" placeholder="Search tasks by title, name or location..." />
+              <!-- NEW: FILTER TABS (keeps UI) -->
+              <div id="adminTabs" class="task-tabs" style="margin-top:8px;">
+                <button class="tab active" data-tab="all">All</button>
+                <button class="tab" data-tab="pending">Pending</button>
+                <button class="tab" data-tab="completed">Completed</button>
+                <button class="tab" data-tab="overdue">Overdue</button>
+                <button class="tab" data-tab="recurring">Recurring</button>
+              </div>
             </div>
               <select id="filterDept" class="input" style="margin-left:10px; max-width:180px;">
                 <option value="">All departments</option>
@@ -132,7 +145,7 @@
 
         <div><b>Assigned to</b><div id="adminDetailAssigned" class="small"></div></div>
 
-        <!-- 🔥 FIXED: ADDED MISSING DEPARTMENT FIELD -->
+        <!-- department field -->
         <div><b>Department</b><div id="adminDetailDept" class="small"></div></div>
 
         <div><b>Deadline</b><div id="adminDetailDeadline" class="small"></div></div>

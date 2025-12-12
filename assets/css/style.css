@@ -136,3 +136,30 @@ body{
   .modal{ width:92%; }
   .controls{ flex-wrap:wrap; }
 }
+
+/* ======================= */
+/*        TASK TABS        */
+/* ======================= */
+
+.task-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.task-tabs .tab {
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+  font-size: 13px;
+  transition: 0.2s;
+}
+
+.task-tabs .tab.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
