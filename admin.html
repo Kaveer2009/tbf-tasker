@@ -4,12 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>TaskManager — Admin</title>
-
-  <!-- Chart.js for analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
   <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .modal .meta-row { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0; }
+    .progress-bar { width:100%; height:10px; background:#eee; border-radius:6px; overflow:hidden; }
+    .progress-bar > .fill { height:100%; background:linear-gradient(90deg,#4ade80,#06b6d4); width:0%; }
+    .admin-subtask { display:flex; align-items:center; gap:8px; padding:8px; border-bottom:1px solid #f1f1f1;}
+    .admin-subtask .txt { flex:1; color:#333; }
+    .admin-subtask .txt.done { text-decoration:line-through; color:#777; }
+  </style>
 </head>
+
 <body>
   <div class="container">
     <header class="header">
@@ -30,7 +36,6 @@
     </header>
 
     <main class="grid">
-      <!-- left main content -->
       <section>
         <div class="card">
           <div class="stats">
@@ -44,6 +49,10 @@
             <div style="flex:1;">
               <input id="searchTasks" class="input" placeholder="Search tasks by title, name or location..." />
             </div>
+              <select id="filterDept" class="input" style="margin-left:10px; max-width:180px;">
+                <option value="">All departments</option>
+              </select>
+
             <div style="width:260px;">
               <canvas id="tasksPie" width="260" height="120"></canvas>
             </div>
@@ -56,7 +65,6 @@
         </div>
       </section>
 
-      <!-- right sidebar -->
       <aside>
         <div class="card">
           <h4 style="margin:0 0 8px 0;">Employees</h4>
@@ -73,9 +81,7 @@
     </main>
   </div>
 
-  <!-- MODALS -->
-
-  <!-- Create/Edit Task Modal -->
+  <!-- CREATE / EDIT TASK MODAL (unchanged UI) -->
   <div id="taskModal" class="modal-bg">
     <div class="modal">
       <h3 id="taskModalTitle">Create Task</h3>
@@ -89,39 +95,127 @@
         <div id="assignSuggestions" class="suggestions" style="display:none"></div>
       </div>
 
-      <label class="small">Location (multiple lines allowed)</label>
-      <textarea id="taskLocation" class="input" placeholder="e.g. Beside the conference room wall&#10;Below the wardrobe"></textarea>
+      <label class="small">Location</label>
+      <textarea id="taskLocation" class="input"></textarea>
 
       <label class="small">Deadline</label>
       <input id="taskDeadline" class="input" type="datetime-local">
 
-      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+      <label class="small">Recurring</label>
+      <select id="taskRecurrence" class="input">
+        <option value="none">None</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+
+      <label class="small">Subtasks</label>
+      <div id="subtasksContainer"></div>
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <input id="newSubtaskText" class="input" placeholder="New subtask">
+        <button id="addSubtaskBtn" class="btn btn-green">Add</button>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
         <button id="saveTaskBtn" class="btn btn-blue">Save</button>
         <button onclick="closeModal('taskModal')" class="btn btn-red">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Create Employee Modal -->
+  <!-- ADMIN DETAIL MODAL -->
+  <div id="adminDetailModal" class="modal-bg">
+    <div class="modal" style="max-width:700px;">
+      <h3 id="adminDetailTitle">Task details</h3>
+
+      <div class="meta-row">
+
+        <div><b>Assigned to</b><div id="adminDetailAssigned" class="small"></div></div>
+
+        <!-- 🔥 FIXED: ADDED MISSING DEPARTMENT FIELD -->
+        <div><b>Department</b><div id="adminDetailDept" class="small"></div></div>
+
+        <div><b>Deadline</b><div id="adminDetailDeadline" class="small"></div></div>
+        <div><b>Created</b><div id="adminDetailCreated" class="small"></div></div>
+
+        <div id="adminDetailCompletedWrap" style="display:none">
+          <b>Completed</b><div id="adminDetailCompleted" class="small"></div>
+        </div>
+      </div>
+
+      <div id="adminDetailDesc" class="small"></div>
+
+      <div style="margin-top:12px;">
+        <div class="small"><b>Progress</b></div>
+        <div class="progress-bar" id="adminDetailProgress"><div class="fill"></div></div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="small"><b>Checklist</b></div>
+        <div id="adminDetailSubtasks"></div>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+        <button id="adminEditBtn" class="btn btn-blue">Edit</button>
+        <button id="adminDeleteBtn" class="btn btn-red">Delete</button>
+        <button id="adminReopenBtn" class="btn btn-blue" style="display:none">Re-open</button>
+        <button id="adminMarkDoneBtn" class="btn btn-green">Mark Done</button>
+        <button onclick="closeModal('adminDetailModal')" class="btn btn-muted">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE EMPLOYEE MODAL -->
   <div id="userModal" class="modal-bg">
     <div class="modal">
       <h3>Create Employee</h3>
       <input id="newName" class="input" placeholder="Full name">
       <input id="newEmail" class="input" placeholder="Email">
-      <input id="newPass" class="input" placeholder="Password (min 6)" type="password">
-      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+      <input id="newPass" class="input" placeholder="Password" type="password">
+      <select id="newDeptSelect" class="input"></select>
+      <button id="openAddDeptBtn" class="btn btn-blue" style="margin-top:6px;">+ Add Department</button>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
         <button id="createUserBtn" class="btn btn-green">Create</button>
         <button onclick="closeModal('userModal')" class="btn btn-red">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Logout confirm -->
+  <!-- EDIT EMPLOYEE MODAL -->
+  <div id="editUserModal" class="modal-bg">
+    <div class="modal">
+      <h3>Edit Employee</h3>
+      <input id="editName" class="input" placeholder="Name">
+      <input id="editEmail" class="input" placeholder="Email" disabled>
+      <select id="editDeptSelect" class="input"></select>
+      <button id="openAddDeptBtn2" class="btn btn-blue" style="margin-top:6px;">+ Add Department</button>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button id="saveEditUserBtn" class="btn btn-green">Save</button>
+        <button onclick="closeModal('editUserModal')" class="btn btn-red">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD DEPARTMENT -->
+  <div id="addDeptModal" class="modal-bg">
+    <div class="modal">
+      <h3>Create Department</h3>
+      <input id="newDeptName" class="input" placeholder="Department">
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button id="createDeptBtn" class="btn btn-green">Create</button>
+        <button onclick="closeModal('addDeptModal')" class="btn btn-red">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGOUT CONFIRM -->
   <div id="logoutModal" class="modal-bg">
     <div class="modal">
       <h3>Logout</h3>
-      <p class="small">Are you sure you want to logout?</p>
-      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+      <p class="small">Are you sure?</p>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
         <button id="confirmLogout" class="btn btn-red">Logout</button>
         <button onclick="closeModal('logoutModal')" class="btn btn-blue">Cancel</button>
       </div>

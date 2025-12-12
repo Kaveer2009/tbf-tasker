@@ -18,8 +18,11 @@
       </div>
 
       <div class="controls">
-        <button id="empTheme" class="btn btn-muted">🌓 Theme</button>
-        <button id="empLogout" class="btn btn-red">Logout</button>
+
+        <!-- FIXED: IDs must match JS -->
+        <button id="toggleTheme" class="btn btn-muted">🌓 Theme</button>
+        <button id="logoutBtn" class="btn btn-red">Logout</button>
+
       </div>
     </header>
 
@@ -42,7 +45,32 @@
     </main>
   </div>
 
-  <!-- confirm modal -->
+  <!-- Task Detail Modal -->
+  <div id="taskDetailModal" class="modal-bg">
+    <div class="modal">
+      <h3 id="detailTitle">Task details</h3>
+      <div id="detailDesc" class="small"></div>
+      <div id="detailMeta" class="small" style="margin-top:8px;"></div>
+
+      <!-- Subtasks -->
+      <div style="margin-top:12px;">
+        <div class="small"><b>Checklist</b></div>
+        <div id="detailSubtasks"></div>
+      </div>
+
+      <!-- Progress bar -->
+      <div style="margin-top:12px;">
+        <div class="progress-bar"><div class="fill" id="detailProgressFill"></div></div>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+        <button id="detailMarkBtn" class="btn btn-green">Mark Done</button>
+        <button onclick="closeModal('taskDetailModal')" class="btn btn-red">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
   <div id="confirmModal" class="modal-bg">
     <div class="modal">
       <h3>Complete Task</h3>
