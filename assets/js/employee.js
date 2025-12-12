@@ -1,6 +1,4 @@
-// employee.js — FINAL FIXED FULL FILE
-//------------------------------------------------------------
-// Firebase Imports
+// employee.js — THE ONLY FULLY CORRECT VERSION
 //------------------------------------------------------------
 import {
   collection, query, where, orderBy,
@@ -11,7 +9,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/f
 import { auth, db } from "./firebase-config.js";
 
 //------------------------------------------------------------
-// GLOBAL MODAL HELPERS
+// MODAL HELPERS
 //------------------------------------------------------------
 window.openModal = id => document.getElementById(id).style.display = "flex";
 window.closeModal = id => document.getElementById(id).style.display = "none";
@@ -37,35 +35,24 @@ const detailSubtasksEl = document.getElementById("detailSubtasks");
 const detailProgressFillEl = document.getElementById("detailProgressFill");
 const detailMarkBtnEl = document.getElementById("detailMarkBtn");
 
-const confirmModalEl = document.getElementById("confirmModal");
 const confirmTextEl = document.getElementById("confirmText");
 const confirmYesBtn = document.getElementById("confirmYes");
 const confirmNoBtn = document.getElementById("confirmNo");
 
 //------------------------------------------------------------
-// FIXED: THEME + LOGOUT BUTTONS
+// FIXED THEME + LOGOUT (MATCHES YOUR HTML IDs)
 //------------------------------------------------------------
-function attachEvents() {
-  const themeBtn = document.getElementById("empTheme");
-  const logoutBtn = document.getElementById("empLogout");
+document.getElementById("toggleTheme").onclick = () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("tm-theme", next);
+};
 
-  if (themeBtn) {
-    themeBtn.onclick = () => {
-      const cur = document.documentElement.getAttribute("data-theme");
-      const next = cur === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", next);
-      localStorage.setItem("tm-theme", next);
-    };
-  }
-
-  if (logoutBtn) {
-    logoutBtn.onclick = () => {
-      auth.signOut();
-      window.location.href = "login.html";
-    };
-  }
-}
-attachEvents();
+document.getElementById("logoutBtn").onclick = () => {
+  auth.signOut();
+  window.location.href = "login.html";
+};
 
 //------------------------------------------------------------
 // UTILITIES
@@ -77,7 +64,7 @@ function fmt(v) {
 
 function escapeHtml(s) {
   return s ? s.replace(/[&<>"']/g, m =>
-    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m])
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])
   ) : "";
 }
 
@@ -88,13 +75,13 @@ let CURRENT_TASK_ID = null;
 let tasksLocal = [];
 
 //------------------------------------------------------------
-// AUTH WATCHER
+// AUTH + REAL-TIME TASK FETCH
 //------------------------------------------------------------
 onAuthStateChanged(auth, async user => {
   if (!user) return (window.location.href = "login.html");
 
-  const snap = await getDoc(doc(db, "users", user.uid));
-  if (empNameEl) empNameEl.textContent = snap.exists() ? snap.data().name : user.email;
+  const u = await getDoc(doc(db, "users", user.uid));
+  empNameEl.textContent = u.exists() ? u.data().name : user.email;
 
   const q = query(
     collection(db, "tasks"),
@@ -110,22 +97,21 @@ onAuthStateChanged(auth, async user => {
       tasksLocal.push(d);
     });
 
-    updateEmployeeCounts(tasksLocal);  // 🔥 FIXED — now updates counts!
+    updateEmployeeCounts(tasksLocal);
     renderTasks();
   });
 });
 
 //------------------------------------------------------------
-// UPDATE COUNTS BELOW EMPLOYEE NAME
+// UPDATE COUNTS (works now)
 //------------------------------------------------------------
 function updateEmployeeCounts(tasks) {
-  if (!empCountsEl) return;
-
   const total = tasks.length;
   const completed = tasks.filter(t => t.status === "done").length;
   const pending = tasks.filter(t => t.status !== "done").length;
+
   const overdue = tasks.filter(t => {
-    if (t.status === "done" || !t.deadline) return false;
+    if (!t.deadline || t.status === "done") return false;
     const dl = t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime();
     return dl < Date.now();
   }).length;
@@ -135,15 +121,22 @@ function updateEmployeeCounts(tasks) {
 }
 
 //------------------------------------------------------------
-// RENDER TASK CARDS
+// SEARCH FIX — NOW WORKS
+//------------------------------------------------------------
+empSearch.oninput = () => renderTasks();
+
+//------------------------------------------------------------
+// RENDER TASKS
 //------------------------------------------------------------
 function renderTasks() {
   const q = empSearch.value.trim().toLowerCase();
+
   const list = tasksLocal.filter(t => {
-    const title = (t.title || "").toLowerCase();
-    const desc = (t.description || "").toLowerCase();
-    const loc = (t.location || "").toLowerCase();
-    return !q || title.includes(q) || desc.includes(q) || loc.includes(q);
+    return (
+      (t.title || "").toLowerCase().includes(q) ||
+      (t.description || "").toLowerCase().includes(q) ||
+      (t.location || "").toLowerCase().includes(q)
+    );
   });
 
   empTasksGrid.innerHTML = "";
@@ -162,23 +155,17 @@ function renderTasks() {
     const total = Array.isArray(t.subtasks) ? t.subtasks.length : 0;
     const pct = total ? Math.round((doneCount / total) * 100) : 0;
 
-    const locationHtml = t.location
-      ? `<div class="small"><b>Location:</b><br><pre style="white-space:pre-wrap;margin:6px 0 0 0;">${escapeHtml(t.location)}</pre></div>`
-      : "";
-
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "task-card";
+
     card.style.background =
-      t.status === "done"
-        ? "linear-gradient(180deg, #eaffea, #d7ffd7)"
-        : overdue
-        ? "linear-gradient(180deg, #ffecec, #ffdede)"
-        : "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.78))";
+      t.status === "done" ? "#e7ffea" :
+      overdue ? "#ffecec" : "white";
 
     card.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;justify-content:space-between;">
         <div style="flex:1;">
-          <h3 style="margin:0;">${escapeHtml(t.title)}</h3>
+          <h3>${escapeHtml(t.title)}</h3>
           <div class="small">${escapeHtml(t.description || "")}</div>
 
           <div class="small" style="margin-top:6px;">
@@ -190,10 +177,9 @@ function renderTasks() {
             <div class="fill" style="width:${pct}%;"></div>
           </div>
 
-          ${locationHtml}
+          ${t.location ? `<div class="small"><b>Location:</b><br>${escapeHtml(t.location)}</div>` : ""}
         </div>
-
-        <div style="display:flex; flex-direction:column; gap:8px; margin-left:12px;">
+        <div>
           <button class="btn btn-blue" data-id="${t.id}">Open</button>
         </div>
       </div>
@@ -205,16 +191,16 @@ function renderTasks() {
 }
 
 //------------------------------------------------------------
-// OPEN TASK DETAIL MODAL
+// OPEN DETAIL MODAL
 //------------------------------------------------------------
-window.openTaskDetailLocal = async function(id) {
+window.openTaskDetailLocal = async (id) => {
   const snap = await getDoc(doc(db, "tasks", id));
   if (!snap.exists()) return alert("Task missing");
 
   const t = snap.data();
   CURRENT_TASK_ID = id;
 
-  detailTitleEl.textContent = t.title || "";
+  detailTitleEl.textContent = t.title;
   detailDescEl.innerHTML =
     `<b>Description:</b><br>${escapeHtml(t.description || "")}<br><br>` +
     `<b>Location:</b><br>${escapeHtml((t.location || "").replace(/\n/g, "<br>"))}`;
@@ -224,34 +210,25 @@ window.openTaskDetailLocal = async function(id) {
     `Deadline: <b>${fmt(t.deadline)}</b><br>` +
     `Status: <b>${t.status}</b>`;
 
-  // subtasks
   detailSubtasksEl.innerHTML = "";
   const subs = Array.isArray(t.subtasks) ? t.subtasks : [];
 
   subs.forEach((s, i) => {
     const row = document.createElement("div");
-    row.style.padding = "6px";
-    row.style.borderBottom = "1px solid #eee";
-
     row.innerHTML = `
       <input type="checkbox" data-i="${i}" ${s.done ? "checked" : ""}>
-      <span style="margin-left:8px;${s.done ? "text-decoration:line-through;" : ""}">
+      <span style="margin-left:8px; ${s.done ? "text-decoration:line-through;" : ""}">
         ${escapeHtml(s.text)}
       </span>
     `;
-
     row.querySelector("input").onchange = () => updateSubtaskState(id);
     detailSubtasksEl.appendChild(row);
   });
 
-  // progress bar
-  if (detailProgressFillEl) {
-    const done = subs.filter(s => s.done).length;
-    detailProgressFillEl.style.width =
-      subs.length ? Math.round((done / subs.length) * 100) + "%" : "0%";
-  }
+  const done = subs.filter(s => s.done).length;
+  detailProgressFillEl.style.width =
+    subs.length ? Math.round((done / subs.length) * 100) + "%" : "0%";
 
-  // mark done button
   detailMarkBtnEl.style.display = subs.length ? "none" : "inline-block";
   detailMarkBtnEl.onclick = () => {
     confirmTextEl.textContent = t.title;
@@ -262,7 +239,7 @@ window.openTaskDetailLocal = async function(id) {
 };
 
 //------------------------------------------------------------
-// UPDATE SUBTASK CHECKS
+// UPDATE SUBTASK
 //------------------------------------------------------------
 async function updateSubtaskState(id) {
   const snap = await getDoc(doc(db, "tasks", id));
@@ -282,7 +259,6 @@ async function updateSubtaskState(id) {
   detailProgressFillEl.style.width =
     subs.length ? Math.round(done / subs.length * 100) + "%" : "0%";
 
-  // auto-complete if all done
   if (subs.length && subs.every(s => s.done)) {
     await updateDoc(doc(db, "tasks", id), {
       status: "done",
@@ -293,7 +269,7 @@ async function updateSubtaskState(id) {
 }
 
 //------------------------------------------------------------
-// CONFIRM COMPLETE
+// CONFIRM DONE
 //------------------------------------------------------------
 confirmYesBtn.onclick = async () => {
   if (!CURRENT_TASK_ID) return;
