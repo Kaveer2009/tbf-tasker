@@ -163,3 +163,23 @@ body{
   color: white;
   border-color: var(--accent);
 }
+
+/* Inventory cards responsive layout */
+.inventory-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* Large screens → 2 columns */
+@media (min-width: 768px) {
+  .inventory-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .inventory-grid > .card {
+    height: 100%;
+  }
+}

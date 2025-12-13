@@ -84,6 +84,26 @@
           <div id="employeeSidebar" class="side-list">Loading employees...</div>
         </div>
 
+        <!-- INVENTORY MODULE -->
+        <div class="card" style="margin-top:14px;">
+          <h3>Inventory</h3>
+          <button id="openInventoryUsageBtn" class="btn btn-blue" style="margin-bottom:10px; width:100%;">📋 View Inventory Usage</button>
+
+          <div style="display:flex; gap:8px; margin-bottom:10px;">
+            <input id="invName" class="input" placeholder="Item name">
+            <input id="invQty" class="input" type="number" placeholder="Quantity">
+            <input id="invUnit" class="input" placeholder="Unit (kg, bags...)">
+            <button id="addInventoryBtn" class="btn btn-green">Add</button>
+          </div>
+
+          <div id="inventoryList"></div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>Material Requests</h3>
+          <div id="adminRequests"></div>
+        </div>
+
         <div class="card" style="margin-top:12px;">
           <h4 style="margin:0 0 8px 0;">Analytics</h4>
           <div style="height:200px;">
@@ -234,7 +254,24 @@
       </div>
     </div>
   </div>
+  <!-- INVENTORY USAGE MODAL -->
+  <div id="inventoryUsageModal" class="modal-bg">
+    <div class="modal" style="max-width:700px;">
+      <h3>📋 Inventory Usage</h3>
+
+      <div id="inventoryUsageList"></div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+        <button onclick="closeModal('inventoryUsageModal')"
+          class="btn btn-muted">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
 
   <script type="module" src="assets/js/admin.js"></script>
+  <script type="module" src="assets/js/inventory-admin.js"></script>
 </body>
 </html>

@@ -41,6 +41,21 @@
                 <button class="tab" data-tab="recurring">Recurring</button>
               </div>
           </div>
+          <div class="inventory-grid">
+
+            <div class="card">
+              <h3>Request Material</h3>
+              <select id="reqItem" class="input"></select>
+              <input id="reqQty" class="input" type="number" placeholder="Quantity">
+              <button id="sendReqBtn" class="btn btn-blue">Request</button>
+            </div>
+            <button id="openMyToolsBtn" class="btn btn-muted" style="margin-top:8px;">
+              🧰 My Tools
+            </button>
+
+
+          </div>
+
         </div>
       </div>
 
@@ -84,7 +99,21 @@
       </div>
     </div>
   </div>
+  <!-- MY TOOLS MODAL -->
+  <div id="myToolsModal" class="modal-bg">
+    <div class="modal">
+      <h3>My Tools / Materials</h3>
+
+      <div id="myToolsModalList"></div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+        <button onclick="closeModal('myToolsModal')" class="btn btn-red">Close</button>
+      </div>
+    </div>
+  </div>
+
 
   <script type="module" src="assets/js/employee.js"></script>
+  <script type="module" src="assets/js/inventory-employee.js"></script>
 </body>
 </html>
