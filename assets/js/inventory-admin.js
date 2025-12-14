@@ -127,7 +127,8 @@ function startMaterialRequestStream() {
         <div class="small">
           🧰 ${d.itemName}<br>
           👤 ${d.employeeName}<br>
-          🔢 Qty: ${d.qty}
+          🧱 Task: <b>${d.taskTitle || "—"}</b><br>
+          🔢 Qty: <b>${d.qty}</b>
         </div>
 
         <div style="display:flex; gap:8px; margin-top:8px;">
@@ -137,6 +138,7 @@ function startMaterialRequestStream() {
             onclick="rejectIssue('${docu.id}')">Reject</button>
         </div>
       `;
+
 
       adminRequests.appendChild(card);
     });
@@ -163,13 +165,19 @@ window.approveIssue = async function (reqId) {
   await addDoc(collection(db, "inventory_logs"), {
     itemId: req.itemId,
     itemName: req.itemName,
+
+    taskId: req.taskId,
+    taskTitle: req.taskTitle,
+
     employeeId: req.employeeId,
     employeeName: req.employeeName,
+
     qty: req.qty,
     status: "taken",
     takenAt: serverTimestamp(),
     returnedQty: 0
   });
+
 
   await updateDoc(invRef, {
     availableQty: inv.availableQty - req.qty
@@ -194,6 +202,17 @@ function startReturnRequestStream() {
   );
 
   onSnapshot(q, snap => {
+    const adminReturnRequests =
+      document.getElementById("adminReturnRequests");
+
+    adminReturnRequests.innerHTML = "";
+
+    if (snap.empty) {
+      adminReturnRequests.innerHTML =
+        `<div class="small">No return requests</div>`;
+      return;
+    }
+
     snap.forEach(docu => {
       const d = docu.data();
 
@@ -205,19 +224,22 @@ function startReturnRequestStream() {
         <div class="small">
           🧰 ${d.itemName}<br>
           👤 ${d.employeeName}<br>
-          🔢 Qty: ${d.returnQtyRequested}
+          🧱 Task: ${d.taskTitle || "—"}<br>
+          🔢 Qty: <b>${d.returnQtyRequested}</b>
         </div>
 
         <button class="btn btn-green"
+          style="margin-top:8px"
           onclick="approveReturn('${docu.id}')">
           Approve Return
         </button>
       `;
 
-      adminRequests.appendChild(card);
+      adminReturnRequests.appendChild(card);
     });
   });
 }
+
 
 /* ================= APPROVE RETURN ================= */
 window.approveReturn = async function (logId) {
@@ -251,7 +273,7 @@ if (openInventoryUsageBtn) {
     openModal("inventoryUsageModal");
 }
 
-/* ================= INVENTORY USAGE (NO INDEX REQUIRED) ================= */
+/* ================= INVENTORY USAGE (TASK-AWARE) ================= */
 function startInventoryUsageStream() {
   const q = query(
     collection(db, "inventory_logs"),
@@ -271,20 +293,22 @@ function startInventoryUsageStream() {
 
     snap.forEach(docu => {
       const d = docu.data();
-      const key = `${d.employeeId}_${d.itemId}`;
+
+      // 🔑 EMPLOYEE + ITEM + TASK
+      const key = `${d.employeeId}_${d.itemId}_${d.taskId || "no-task"}`;
 
       if (!grouped[key]) {
         grouped[key] = {
           itemName: d.itemName,
           employeeName: d.employeeName,
+          taskTitle: d.taskTitle || "—",
           qty: 0,
           takenAt: d.takenAt
         };
       }
 
-      grouped[key].qty += d.qty || 1;
+      grouped[key].qty += d.qty;
 
-      // earliest takenAt
       if (
         d.takenAt &&
         (!grouped[key].takenAt ||
@@ -294,14 +318,7 @@ function startInventoryUsageStream() {
       }
     });
 
-    // sort client-side (latest first)
-    const sorted = Object.values(grouped).sort((a, b) => {
-      if (!a.takenAt) return 1;
-      if (!b.takenAt) return -1;
-      return b.takenAt.seconds - a.takenAt.seconds;
-    });
-
-    sorted.forEach(r => {
+    Object.values(grouped).forEach(r => {
       const card = document.createElement("div");
       card.className = "card";
       card.style.marginBottom = "8px";
@@ -310,6 +327,7 @@ function startInventoryUsageStream() {
         <h4>🧰 ${r.itemName}</h4>
         <div class="small">
           👤 ${r.employeeName}<br>
+          🧱 Task: <b>${r.taskTitle}</b><br>
           🔢 Qty: <b>${r.qty}</b><br>
           🕒 Since: ${
             r.takenAt
@@ -323,4 +341,5 @@ function startInventoryUsageStream() {
     });
   });
 }
+
 

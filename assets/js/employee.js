@@ -1,35 +1,40 @@
-// employee.js — FINAL VERSION WITH FILTER TABS
+// employee.js — FINAL FULLY FIXED (SUBTASKS + MARK DONE + TIME LEFT)
 //------------------------------------------------------------
 import {
   collection, query, where, orderBy,
   onSnapshot, doc, getDoc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
 import { auth, db } from "./firebase-config.js";
 
 //------------------------------------------------------------
 // MODAL HELPERS
 //------------------------------------------------------------
-window.openModal = id => document.getElementById(id).style.display = "flex";
-window.closeModal = id => document.getElementById(id).style.display = "none";
+window.openModal = id =>
+  document.getElementById(id).style.display = "flex";
+
+window.closeModal = id =>
+  document.getElementById(id).style.display = "none";
 
 //------------------------------------------------------------
 // THEME INIT
 //------------------------------------------------------------
-const savedTheme = localStorage.getItem("tm-theme") || "light";
-document.documentElement.setAttribute("data-theme", savedTheme);
+document.documentElement.setAttribute(
+  "data-theme",
+  localStorage.getItem("tm-theme") || "light"
+);
 
 //------------------------------------------------------------
-// DOM REFS
+// DOM
 //------------------------------------------------------------
 const empNameEl = document.getElementById("empName");
 const empCountsEl = document.getElementById("empCounts");
 const empTasksGrid = document.getElementById("empTasksGrid");
 const empSearch = document.getElementById("empSearch");
-
 const tabsParent = document.getElementById("empTabs");
-let currentTab = "all";
 
 const detailTitleEl = document.getElementById("detailTitle");
 const detailDescEl = document.getElementById("detailDesc");
@@ -43,21 +48,6 @@ const confirmYesBtn = document.getElementById("confirmYes");
 const confirmNoBtn = document.getElementById("confirmNo");
 
 //------------------------------------------------------------
-// THEME + LOGOUT
-//------------------------------------------------------------
-document.getElementById("toggleTheme").onclick = () => {
-  const cur = document.documentElement.getAttribute("data-theme");
-  const next = cur === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", next);
-  localStorage.setItem("tm-theme", next);
-};
-
-document.getElementById("logoutBtn").onclick = () => {
-  auth.signOut();
-  window.location.href = "login.html";
-};
-
-//------------------------------------------------------------
 // UTILITIES
 //------------------------------------------------------------
 function fmt(v) {
@@ -65,10 +55,31 @@ function fmt(v) {
   return (v.toDate ? v.toDate() : new Date(v)).toLocaleString();
 }
 
+function timeLeft(deadline) {
+  if (!deadline) return "—";
+
+  const end = deadline.toDate
+    ? deadline.toDate().getTime()
+    : new Date(deadline).getTime();
+
+  const diff = end - Date.now();
+  if (diff <= 0) return "⛔ Overdue";
+
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+
+  if (days > 0) return `⏳ ${days} day${days > 1 ? "s" : ""} left`;
+  if (hrs > 0) return `⏳ ${hrs} hour${hrs > 1 ? "s" : ""} left`;
+  return `⏳ ${mins} min left`;
+}
+
 function escapeHtml(s) {
-  return s ? s.replace(/[&<>"']/g, m =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])
-  ) : "";
+  return s
+    ? s.replace(/[&<>"']/g, m =>
+        ({ "&":"&amp;","<":"&lt;",">":"&gt;",
+           '"':"&quot;","'":"&#39;" }[m]))
+    : "";
 }
 
 //------------------------------------------------------------
@@ -76,12 +87,13 @@ function escapeHtml(s) {
 //------------------------------------------------------------
 let CURRENT_TASK_ID = null;
 let tasksLocal = [];
+let currentTab = "all";
 
 //------------------------------------------------------------
-// AUTH + REALTIME
+// AUTH
 //------------------------------------------------------------
 onAuthStateChanged(auth, async user => {
-  if (!user) return (window.location.href = "login.html");
+  if (!user) return location.href = "login.html";
 
   const u = await getDoc(doc(db, "users", user.uid));
   empNameEl.textContent = u.exists() ? u.data().name : user.email;
@@ -95,38 +107,36 @@ onAuthStateChanged(auth, async user => {
   onSnapshot(q, snap => {
     tasksLocal = [];
     snap.forEach(s => tasksLocal.push({ id: s.id, ...s.data() }));
-
-    updateEmployeeCounts(tasksLocal);
+    updateCounts();
     renderTasks();
   });
 });
 
 //------------------------------------------------------------
-// EMPLOYEE COUNTS
+// COUNTS
 //------------------------------------------------------------
-function updateEmployeeCounts(tasks) {
-  const total = tasks.length;
-  const completed = tasks.filter(t => t.status === "done").length;
-  const pending = tasks.filter(t => t.status !== "done").length;
+function updateCounts() {
+  const total = tasksLocal.length;
+  const completed = tasksLocal.filter(t => t.status === "done").length;
+  const pending = total - completed;
 
-  const overdue = tasks.filter(t => {
-    if (!t.deadline || t.status === "done") return false;
-    const dl = t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime();
-    return dl < Date.now();
-  }).length;
+  const overdue = tasksLocal.filter(t =>
+    t.deadline &&
+    t.status !== "done" &&
+    (t.deadline.toDate
+      ? t.deadline.toDate().getTime()
+      : new Date(t.deadline).getTime()) < Date.now()
+  ).length;
 
   empCountsEl.textContent =
     `${total} tasks • ${pending} pending • ${completed} completed • ${overdue} overdue`;
 }
 
 //------------------------------------------------------------
-// SEARCH EVENT
+// FILTERS
 //------------------------------------------------------------
-empSearch.oninput = () => renderTasks();
+empSearch.oninput = renderTasks;
 
-//------------------------------------------------------------
-// TAB FILTER CLICK
-//------------------------------------------------------------
 tabsParent.querySelectorAll(".tab").forEach(btn => {
   btn.onclick = () => {
     tabsParent.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
@@ -137,99 +147,125 @@ tabsParent.querySelectorAll(".tab").forEach(btn => {
 });
 
 //------------------------------------------------------------
-// MAIN RENDER FUNCTION (SEARCH + TABS)
+// RENDER TASKS
 //------------------------------------------------------------
 function renderTasks() {
-  const q = empSearch.value.trim().toLowerCase();
+  const q = empSearch.value.toLowerCase().trim();
 
   let list = tasksLocal.filter(t =>
     (t.title || "").toLowerCase().includes(q) ||
-    (t.description || "").toLowerCase().includes(q) ||
-    (t.location || "").toLowerCase().includes(q)
+    (t.description || "").toLowerCase().includes(q)
   );
 
-  // TAB FILTERING
-  if (currentTab === "pending") list = list.filter(t => t.status !== "done");
-  if (currentTab === "completed") list = list.filter(t => t.status === "done");
+  /* ---------------- TAB FILTERS (FIXED) ---------------- */
+
+  if (currentTab === "pending") {
+    list = list.filter(t => t.status !== "done");
+  }
+
+  if (currentTab === "completed") {
+    list = list.filter(t => t.status === "done");
+  }
+
   if (currentTab === "overdue") {
     list = list.filter(t => {
-      if (!t.deadline || t.status === "done") return false;
-      const dl = t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime();
+      if (t.status === "done") return false;
+      if (!t.deadline) return false;
+
+      const dl = t.deadline.toDate
+        ? t.deadline.toDate().getTime()
+        : new Date(t.deadline).getTime();
+
       return dl < Date.now();
     });
   }
-  if (currentTab === "recurring") list = list.filter(t => t.recurrence);
+
+  if (currentTab === "recurring") {
+    list = list.filter(t =>
+      t.recurrence &&
+      t.recurrence !== "none" &&
+      t.status !== "done"
+    );
+  }
+
+  /* ---------------------------------------------------- */
 
   empTasksGrid.innerHTML = "";
   if (!list.length) {
-    empTasksGrid.innerHTML = "<div class='small'>No tasks found.</div>";
+    empTasksGrid.innerHTML = "<div class='small'>No tasks found</div>";
     return;
   }
 
   list.forEach(t => {
-    const overdue =
-      t.deadline &&
-      (t.deadline.toDate ? t.deadline.toDate().getTime() : new Date(t.deadline).getTime()) < Date.now() &&
-      t.status !== "done";
+  const done = t.subtasks?.filter(s => s.done).length || 0;
+  const total = t.subtasks?.length || 0;
+  const pct = total ? Math.round((done / total) * 100) : 0;
 
-    const doneCount = Array.isArray(t.subtasks) ? t.subtasks.filter(s => s.done).length : 0;
-    const total = Array.isArray(t.subtasks) ? t.subtasks.length : 0;
-    const pct = total ? Math.round((doneCount / total) * 100) : 0;
+  const isOverdue =
+    t.deadline &&
+    t.status !== "done" &&
+    (t.deadline.toDate
+      ? t.deadline.toDate().getTime()
+      : new Date(t.deadline).getTime()) < Date.now();
 
-    const card = document.createElement("div");
-    card.className = "task-card";
-    card.style.background =
-      t.status === "done" ? "#e7ffea" :
-      overdue ? "#ffecec" : "white";
+  const card = document.createElement("div");
+  card.className = "task-card";
 
-    card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;">
-        <div style="flex:1;">
-          <h3>${escapeHtml(t.title)}</h3>
-          <div class="small">${escapeHtml(t.description || "")}</div>
+  /* ✅ COLOR LOGIC */
+  if (t.status === "done") {
+    card.style.background = "#e7ffea"; // green
+  } else if (isOverdue) {
+    card.style.background = "#ffecec"; // red
+  } else {
+    card.style.background = "white";
+  }
 
-          <div class="small" style="margin-top:6px;">
-            ⏳ Deadline: <b>${fmt(t.deadline)}</b><br>
-            ${t.status === "done" ? `✅ Completed: <b>${fmt(t.completedAt)}</b>` : ""}
-            ${t.recurrence ? `<br>🔁 <b>${t.recurrence}</b>` : ""}
-          </div>
+  card.innerHTML = `
+      <h3>${escapeHtml(t.title)}</h3>
+      <div class="small">${escapeHtml(t.description || "")}</div>
 
-          <div class="progress-bar" style="margin-top:10px;">
-            <div class="fill" style="width:${pct}%;"></div>
-          </div>
-
-          ${t.location ? `<div class="small"><b>Location:</b><br>${escapeHtml(t.location)}</div>` : ""}
-        </div>
-        <div>
-          <button class="btn btn-blue" data-id="${t.id}">Open</button>
-        </div>
+      <div class="small">
+        ⏳ Deadline: <b>${fmt(t.deadline)}</b><br>
+        ${t.status === "done"
+          ? `✅ Completed: <b>${fmt(t.completedAt)}</b>`
+          : `🕒 Time left: <b>${timeLeft(t.deadline)}</b>`}
       </div>
+
+      <div class="progress-bar">
+        <div class="fill" style="width:${pct}%"></div>
+      </div>
+
+      <button class="btn btn-blue">Open</button>
     `;
 
-    card.querySelector("button").onclick = () => openTaskDetailLocal(t.id);
+    card.querySelector("button").onclick =
+      () => openTaskDetailLocal(t.id);
+
     empTasksGrid.appendChild(card);
   });
+
 }
 
+
 //------------------------------------------------------------
-// DETAIL MODAL + SUBTASK LOGIC
+// DETAIL MODAL
 //------------------------------------------------------------
 window.openTaskDetailLocal = async id => {
   const snap = await getDoc(doc(db, "tasks", id));
-  if (!snap.exists()) return alert("Task missing");
+  if (!snap.exists()) return;
 
   const t = snap.data();
   CURRENT_TASK_ID = id;
 
   detailTitleEl.textContent = t.title;
-  detailDescEl.innerHTML =
-    `<b>Description:</b><br>${escapeHtml(t.description || "")}<br><br>` +
-    `<b>Location:</b><br>${escapeHtml((t.location || "").replace(/\n/g, "<br>"))}`;
+  detailDescEl.innerHTML = escapeHtml(t.description || "");
 
-  detailMetaEl.innerHTML =
-    `Created: <b>${fmt(t.createdAt)}</b><br>` +
-    `Deadline: <b>${fmt(t.deadline)}</b><br>` +
-    `Status: <b>${t.status}</b>`;
+  detailMetaEl.innerHTML = `
+    Deadline: <b>${fmt(t.deadline)}</b><br>
+    ${t.status === "done"
+      ? `Completed: <b>${fmt(t.completedAt)}</b>`
+      : `Time left: <b>${timeLeft(t.deadline)}</b>`}
+  `;
 
   detailSubtasksEl.innerHTML = "";
   const subs = Array.isArray(t.subtasks) ? t.subtasks : [];
@@ -242,7 +278,7 @@ window.openTaskDetailLocal = async id => {
         ${escapeHtml(s.text)}
       </span>
     `;
-    row.querySelector("input").onchange = () => updateSubtaskState(id);
+    row.querySelector("input").onchange = () => updateSubtasks(id);
     detailSubtasksEl.appendChild(row);
   });
 
@@ -250,7 +286,9 @@ window.openTaskDetailLocal = async id => {
   detailProgressFillEl.style.width =
     subs.length ? Math.round((done / subs.length) * 100) + "%" : "0%";
 
-  detailMarkBtnEl.style.display = subs.length ? "none" : "inline-block";
+  detailMarkBtnEl.style.display =
+    subs.length || t.status === "done" ? "none" : "inline-block";
+
   detailMarkBtnEl.onclick = () => {
     confirmTextEl.textContent = t.title;
     openModal("confirmModal");
@@ -262,7 +300,7 @@ window.openTaskDetailLocal = async id => {
 //------------------------------------------------------------
 // SUBTASK UPDATE
 //------------------------------------------------------------
-async function updateSubtaskState(id) {
+async function updateSubtasks(id) {
   const snap = await getDoc(doc(db, "tasks", id));
   if (!snap.exists()) return;
 
@@ -270,15 +308,14 @@ async function updateSubtaskState(id) {
   const subs = [...t.subtasks];
 
   detailSubtasksEl.querySelectorAll("input").forEach(b => {
-    const i = parseInt(b.dataset.i);
-    subs[i].done = b.checked;
+    subs[Number(b.dataset.i)].done = b.checked;
   });
 
   await updateDoc(doc(db, "tasks", id), { subtasks: subs });
 
   const done = subs.filter(s => s.done).length;
   detailProgressFillEl.style.width =
-    subs.length ? Math.round(done / subs.length * 100) + "%" : "0%";
+    subs.length ? Math.round((done / subs.length) * 100) + "%" : "0%";
 
   if (subs.length && subs.every(s => s.done)) {
     await updateDoc(doc(db, "tasks", id), {
@@ -290,7 +327,7 @@ async function updateSubtaskState(id) {
 }
 
 //------------------------------------------------------------
-// CONFIRM DONE
+// CONFIRM DONE (NO SUBTASKS)
 //------------------------------------------------------------
 confirmYesBtn.onclick = async () => {
   if (!CURRENT_TASK_ID) return;
